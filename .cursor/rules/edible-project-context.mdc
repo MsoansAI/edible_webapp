@@ -1,0 +1,90 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Technical Project Summary — Edible.com Edible Arrangements
+1. Project Objective
+The project aims to develop an intelligent, automated AI agent—primarily voice-based—that acts as an interface between end customers, franchisees, and the Edible Arrangements headquarters. Edible Arrangements is a franchise specializing in high-end gifting (chocolates, fruit arrangements, floral pots) for seasonal events such as Christmas, Valentine’s Day, Mother’s Day, etc.
+
+The primary goal is to streamline online ordering and customer support, especially during peak seasonal periods, to reduce delays, minimize refund requests, and improve overall customer satisfaction. The project targets customers, local franchise stores, and the corporate headquarters coordinating the operational chain.
+
+2. Functional Description
+A voice/chat AI agent integrated into the headquarters’ web app, capable of:
+
+Taking orders via voice or text input.
+
+Recommending products and guiding customers through a simple, accessible, and efficient ordering process.
+
+Tracking orders in real-time and handling support requests.
+
+Automatically relaying order information to the central database and relevant franchise stores.
+
+A separate voice agent deployed at each franchise store to handle direct phone calls, synchronized with headquarters.
+
+A flexible web interface combining buttons, text, and voice for maximum accessibility.
+
+User journey:
+
+Customers either use the headquarters’ website (web app + voice agent),
+
+Or call franchise stores directly (local voice agent).
+
+3. Target Users
+End customers, often non-tech-savvy, placing last-minute orders for specific events.
+
+Key needs: ease of use, voice interaction, speed, and reliable delivery times.
+
+Significant seasonal peaks with very high order volumes to manage.
+
+Franchisees and corporate headquarters require a coordinated, automated, and scalable system.
+
+4. Technical Challenges
+Demonstrate an innovative, convincing vision with a fluid, scalable prototype capable of handling peak loads.
+
+Reduce manual support workload and refund rates.
+
+Technical complexities to be addressed in later phases.
+
+5. Planned Technical Architecture
+Backend: Supabase SQL database.
+
+Frontend: prototyping using no-code/low-code tools (Lovable, Cursor, V0).
+
+Standard web app architecture integrating a voice/chat AI agent.
+
+Cloud hosting to be determined.
+
+6. External Integrations
+Stripe (payments).
+
+Supabase (database and user management).
+
+OpenAI (AI engine).
+
+VAPI (voice management), possibly VoiceFlow.
+
+N8n (automation workflows).
+
+SDK communication between VAPI and the web app.
+
+Voiceflow (chatbot integration)
+
+7. Project Constraints
+Very tight deadline (under one week) to deliver a convincing prototype.
+
+Use of fast-to-implement, cost-effective, and flexible tools.
+
+Need for smooth integration between voice agents, the web app, and the database.
+
+8. Planned Steps / Roadmap
+Current phase: development of a functional MVP demo.
+
+Future phases: to be defined after prototype validation and potential contract signing.
+
+9. Long-Term Goals
+Secure an international contract with Edible Arrangements for wide-scale deployment.
+
+Sustainably improve customer experience and operational processes.
+
+Gradual technical and functional evolution based on feedback and needs.
