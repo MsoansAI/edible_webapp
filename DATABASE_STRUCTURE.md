@@ -189,17 +189,52 @@ created_by TEXT (system, franchisee, admin)
 
 ### `franchisees` - Store Information
 ```sql
-id              UUID PRIMARY KEY
-name            TEXT
-email           TEXT
-phone           TEXT
-address         TEXT
-city            TEXT
-state           TEXT
-zip_code        TEXT
-is_active       BOOLEAN
-operating_hours JSONB ({monday: "9-17", tuesday: "9-17"})
+id                  UUID PRIMARY KEY
+store_number        INTEGER UNIQUE (3-digit: 100-999)
+name                TEXT
+email               TEXT
+phone               TEXT
+address             TEXT (full street address)
+city                TEXT
+state               TEXT
+zip_code            TEXT
+opening_hours       JSONB (day-specific hours: {"monday": "9:00am - 7:00pm"})
+is_active           BOOLEAN
+created_at          TIMESTAMP
+updated_at          TIMESTAMP
 ```
+
+> **Note:** Delivery zones (zip codes served) are managed in the `delivery_zones` table, not in `franchisees`.
+
+**Opening Hours JSONB Example:**
+```json
+{
+  "monday": "9:00am - 7:00pm",
+  "tuesday": "9:00am - 7:00pm", 
+  "wednesday": "9:00am - 7:00pm",
+  "thursday": "9:00am - 7:00pm",
+  "friday": "9:00am - 7:00pm",
+  "saturday": "9:00am - 7:00pm",
+  "sunday": "9:00am - 3:00pm"
+}
+```
+
+**Sample Data:**
+- **Store #257 San Diego**: Mon-Sat 9am-7pm, Sun 9am-3pm
+- **Store #263 Torrance**: Same hours
+
+### `delivery_zones` - Franchisee Delivery Areas
+```sql
+id               UUID PRIMARY KEY
+franchisee_id    UUID → franchisees(id)
+zip_codes        TEXT[] (array of zip codes)
+delivery_fee     DECIMAL(10,2)
+min_order_amount DECIMAL(10,2)
+```
+
+**Sample Data:**
+- **Store #257 San Diego**: zip_codes = ["92101", ...], delivery_fee = 5.99, min_order_amount = 25.00
+- **Store #263 Torrance**: zip_codes = ["90501", ...], delivery_fee = 5.99, min_order_amount = 25.00
 
 ### `inventory` - Product Availability per Store
 ```sql
@@ -214,15 +249,6 @@ UNIQUE (franchisee_id, product_id)
 ---
 
 ## ⚙️ **BUSINESS RULES (2 tables)**
-
-### `delivery_zones` - Franchisee Delivery Areas
-```sql
-id               UUID PRIMARY KEY
-franchisee_id    UUID → franchisees(id)
-zip_codes        TEXT[] (array of zip codes)
-delivery_fee     DECIMAL(10,2)
-min_order_amount DECIMAL(10,2)
-```
 
 ### `seasonal_availability` - Product Seasonality
 ```sql
@@ -380,30 +406,25 @@ last_updated    TIMESTAMP
 {
   "store_info": {
     "id": "uuid",
-    "name": "Edible Arrangements - Downtown Boston",
-    "email": "boston@edible.com",
-    "phone": "617-555-0123",
-    "address": "789 Washington St, Boston, MA 02101"
+    "store_number": 257,
+    "name": "Edible Store #257 San Diego",
+    "email": "ca257@edible.store",
+    "phone": "(858) 585-4156",
+    "address": "4340 Genesee ave, #101, San Diego, CA 92117"
   },
-  "hours": {
-    "monday": "9:00 AM - 6:00 PM",
-    "tuesday": "9:00 AM - 6:00 PM",
-    "wednesday": "9:00 AM - 6:00 PM",
-    "thursday": "9:00 AM - 6:00 PM",
-    "friday": "9:00 AM - 8:00 PM",
-    "saturday": "8:00 AM - 8:00 PM",
-    "sunday": "10:00 AM - 5:00 PM"
+  "opening_hours": {
+    "monday": "9:00am - 7:00pm",
+    "tuesday": "9:00am - 7:00pm",
+    "wednesday": "9:00am - 7:00pm",
+    "thursday": "9:00am - 7:00pm",
+    "friday": "9:00am - 7:00pm",
+    "saturday": "9:00am - 7:00pm",
+    "sunday": "9:00am - 3:00pm"
   },
-  "delivery_zones": [
-    {
-      "zip_codes": ["02101", "02102", "02103"],
-      "delivery_fee": 5.99,
-      "min_order_amount": 25.00
-    }
-  ],
-  "contact_info": {
-    "manager_name": "Sarah Johnson",
-    "manager_phone": "617-555-0124"
+  "delivery_info": {
+    "zip_codes": ["92101","92102",...],
+    "delivery_fee": 5.99,
+    "min_order_amount": 25.00
   },
   "inventory_summary": {
     "total_products": 45,
