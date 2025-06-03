@@ -11,7 +11,7 @@ This guide covers all production edge functions, their purposes, input/output fo
 |----------|---------|------------|--------|
 | **`customer-management`** | Complete customer operations (find/create/merge) | 20/min | ✅ **ACTIVE** |
 | **`product-search`** | AI-optimized product discovery & filtering | 30/min | ✅ **ACTIVE** |
-| **`create-order`** | Full order processing workflow | 10/min | ✅ **ACTIVE** |
+| **`order`** | Unified order management (create/retrieve/update) | 20/min | ✅ **ACTIVE** |
 | **`franchisee-inventory`** | Store location & inventory management | 15/min | ✅ **ACTIVE** |
 
 ---
@@ -58,7 +58,7 @@ This guide covers all production edge functions, their purposes, input/output fo
     "_internalId": "uuid-for-orders"
   },
   "orderHistory": [{
-    "orderNumber": "ORD-2025-000001",
+    "orderNumber": "W25710000001-1",
     "date": "Jun 1, 2025",
     "total": "$54.11",
     "status": "Delivered",
@@ -187,68 +187,180 @@ GET /franchisee-inventory/find-nearest?zipCode=02101
 
 ---
 
-## 📦 Order Creation API
+## 📦 Unified Order Management API
 
-**Endpoint**: `POST /functions/v1/create-order`
+**Endpoint**: `/functions/v1/order`
+**Methods**: `GET`, `POST`, `PATCH`
 
-### Request Format
-```json
-{
-  "customer": {
-    "id": "customer-uuid",            // From customer-management response
-    "email": "john@email.com"
-  },
-  "store": {
-    "franchiseeId": "store-uuid"      // From store finder response
-  },
-  "fulfillment": {
-    "type": "delivery",               // "delivery" or "pickup"
-    "scheduledDate": "2025-05-10",
-    "timeSlot": "2:00 PM - 4:00 PM"
-  },
-  "delivery": {                       // Only for delivery orders
-    "recipientName": "Mom",
-    "recipientPhone": "+1234567890",
-    "address": "123 Main St, Boston, MA 02101",
-    "instructions": "Ring doorbell twice"
-  },
-  "items": [{
-    "productId": "product-uuid",      // From product search response
-    "optionId": "option-uuid",        // If customer chose specific option
-    "quantity": 1,
-    "addons": ["addon-uuid-1"]        // Selected add-ons
-  }],
-  "paymentMethod": "credit_card",     // Payment processing details
-  "specialInstructions": "Please include extra napkins"
-}
+### 🔍 GET: Retrieve Orders
+
+#### Get Most Recent Order for Customer
+```
+GET /functions/v1/order?customerId=customer-uuid&outputType=streamlined
 ```
 
-### Response Format
+#### Get Order by Last 4 Digits
+```
+GET /functions/v1/order?orderNumber=0001&outputType=json
+```
+
+**Query Parameters:**
+- `customerId`: UUID of customer (retrieves most recent order)
+- `orderNumber`: Last 4 digits before dash in order number
+- `outputType`: `"streamlined"` (default) or `"json"`
+
+#### Response Formats
+
+**Streamlined Output** (`outputType=streamlined`):
 ```json
 {
   "order": {
-    "id": "order-uuid",
-    "orderNumber": "ORD-2025-000123",
-    "status": "confirmed",
-    "total": "$59.98",
-    "breakdown": {
-      "subtotal": "$54.99",
-      "tax": "$4.99",
-      "deliveryFee": "$0.00"
-    },
-    "deliveryInfo": {
-      "scheduledDate": "2025-05-10",
-      "timeSlot": "2:00 PM - 4:00 PM",
-      "estimatedDelivery": "May 10, 3:00 PM"
+    "orderNumber": "W25710000001-1",
+    "status": "pending",
+    "total": "$54.11",
+    "estimatedDelivery": "Tomorrow 2-4 PM",
+    "items": [{
+      "product": "Chocolate Strawberries Box",
+      "price": "$49.99",
+      "quantity": 1,
+      "addons": ["Greeting Card ($4.99)"]
+    }],
+    "delivery": {
+      "address": "123 Main St, Boston, MA",
+      "instructions": "Ring doorbell"
     }
   },
-  "confirmation": {
-    "email": "Confirmation sent to john@email.com",
-    "sms": "Updates will be sent to +1234567890"
-  },
-  "summary": "Order ORD-2025-000123 confirmed for May 10 delivery!"
+  "summary": "Found order W25710000001-1 for you."
 }
 ```
+
+**JSON Output** (`outputType=json`):
+```json
+{
+  "order": {
+    "order_info": {
+      "id": "uuid",
+      "order_number": "W25710000001-1",
+      "status": "pending",
+      "total_amount": "54.11",
+      "fulfillment_type": "delivery",
+      "scheduled_date": "2025-06-04",
+      "scheduled_time_slot": "2:00 PM - 4:00 PM"
+    },
+    "customer_info": {
+      "name": "John Smith",
+      "email": "john@email.com",
+      "phone": "+1234567890"
+    },
+    "items": [...],
+    "delivery_info": {...},
+    "franchisee_info": {...}
+  },
+  "orderId": "uuid",
+  "lastUpdated": "2025-06-03T13:11:43.418426+00:00"
+}
+```
+
+### 📝 POST: Create New Order
+
+**Request Format:**
+```json
+{
+  "customerId": "customer-uuid",
+  "franchiseeId": "store-uuid",
+  "items": [{
+    "productId": "product-uuid",
+    "optionId": "option-uuid",
+    "quantity": 1,
+    "addons": ["addon-uuid"]
+  }],
+  "deliveryAddress": {
+    "street": "123 Main St",
+    "city": "Boston", 
+    "state": "MA",
+    "zipCode": "02101",
+    "specialInstructions": "Ring doorbell"
+  },
+  "pickupTime": "2:00 PM",  // Alternative to deliveryAddress
+  "specialInstructions": "Please include extra napkins",
+  "giftMessage": "Happy Mother's Day!",
+  "outputType": "streamlined"  // Optional: "streamlined" or "json"
+}
+```
+
+**Response Format:**
+```json
+{
+  "order": {
+    "orderNumber": "W25710000003-1",
+    "total": "$59.98",
+    "estimatedDelivery": "Tomorrow 2-4 PM",
+    "items": [{
+      "product": "Chocolate Strawberries Box",
+      "price": "$54.99",
+      "quantity": 1
+    }],
+    "delivery": {
+      "address": "123 Main St, Boston, MA",
+      "instructions": "Ring doorbell"
+    }
+  },
+  "confirmation": "Perfect! Order W25710000003-1 confirmed for $59.98. Delivering tomorrow 2-4 PM to 123 Main St."
+}
+```
+
+### ✏️ PATCH: Update Existing Order
+
+**Request Format:**
+```json
+{
+  "orderId": "order-uuid",
+  "updates": {
+    "special_instructions": "Leave at back door",
+    "pickup_customer_name": "Jane Smith",
+    "scheduled_date": "2025-06-05",
+    "scheduled_time_slot": "3:00 PM - 5:00 PM"
+  },
+  "outputType": "streamlined"  // Optional: "streamlined" or "json"
+}
+```
+
+**Response Format:**
+```json
+{
+  "order": {
+    "orderNumber": "W25710000001-1",
+    "status": "pending",
+    "total": "$54.11",
+    "estimatedDelivery": "June 5, 3-5 PM",
+    // ... updated order details
+  },
+  "summary": "Order W25710000001-1 updated successfully."
+}
+```
+
+**Error Responses:**
+```json
+// Order cannot be modified (shipped/delivered)
+{
+  "error": "Order cannot be modified",
+  "message": "Order W25710000001-1 is shipped and cannot be modified.",
+  "currentStatus": "shipped"
+}
+
+// Order not found
+{
+  "error": "Order not found"
+}
+```
+
+### 🔐 Update Restrictions
+- Orders with status `shipped` or `delivered` **cannot be updated**
+- Only the following fields can be updated:
+  - `special_instructions`
+  - `pickup_customer_name`
+  - `scheduled_date`
+  - `scheduled_time_slot`
 
 ---
 
@@ -263,7 +375,7 @@ All functions implement intelligent rate limiting:
 
 ### Authentication Levels
 - **Public Access**: Product search, store finder (with rate limits)
-- **Customer Level**: Order creation, customer management (with user token)
+- **Customer Level**: Order operations, customer management (with user token)
 - **Service Role**: AI agents and administrative operations
 
 ### Error Handling
@@ -303,11 +415,28 @@ const store = await callStoreFinder({
 });
 
 // Step 4: Order creation
-const order = await callCreateOrder({
-  customer: customer,
-  store: store,
+const order = await callOrderAPI({
+  method: 'POST',
+  customerId: customer._internalId,
+  franchiseeId: store._internalId,
   items: selectedProducts,
-  fulfillment: userPreference
+  deliveryAddress: extractedAddress,
+  outputType: 'streamlined'
+});
+
+// Step 5: Order tracking (NEW!)
+const orderStatus = await callOrderAPI({
+  method: 'GET',
+  customerId: customer._internalId,
+  outputType: 'streamlined'
+});
+
+// Step 6: Order updates (NEW!)
+const updatedOrder = await callOrderAPI({
+  method: 'PATCH',
+  orderId: order.orderId,
+  updates: { special_instructions: "New instructions" },
+  outputType: 'streamlined'
 });
 ```
 

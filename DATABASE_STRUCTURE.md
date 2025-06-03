@@ -140,7 +140,7 @@ id                   UUID PRIMARY KEY
 customer_id          UUID → customers(id)
 franchisee_id        UUID → franchisees(id)
 recipient_address_id UUID → recipient_addresses(id) (NULL for pickup)
-order_number         TEXT UNIQUE
+order_number         TEXT UNIQUE -- Edible format: W[store_number][sequence]-1 (e.g. W25710000001-1)
 status               TEXT (pending, confirmed, preparing, shipped, delivered)
 fulfillment_type     TEXT ('delivery' or 'pickup')
 subtotal             DECIMAL(10,2)
@@ -152,6 +152,8 @@ pickup_customer_name TEXT (who's picking up, if different)
 special_instructions TEXT
 created_at           TIMESTAMP
 ```
+
+> **Note:** `order_number` is now automatically generated in Edible's internal format: `W[store_number][sequence]-1` (e.g. `W25710000001-1`), where `store_number` is the 3-digit franchisee code and `sequence` is a unique global number.
 
 ### `order_items` - Products in Orders
 ```sql

@@ -309,4 +309,33 @@ DROP TRIGGER IF EXISTS delivery_zones_delete_sync_trigger ON delivery_zones;
 CREATE TRIGGER delivery_zones_delete_sync_trigger
     AFTER DELETE ON delivery_zones
     FOR EACH ROW
-    EXECUTE FUNCTION trigger_sync_franchisees_from_delivery_zones_delete(); 
+    EXECUTE FUNCTION trigger_sync_franchisees_from_delivery_zones_delete();
+
+-- Step X: Update generate_order_number() to Edible format
+
+-- 1. Ensure the sequence exists
+CREATE SEQUENCE IF NOT EXISTS edible_order_seq START 10000000;
+
+-- 2. Replace the trigger function
+CREATE OR REPLACE FUNCTION generate_order_number()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    store_num TEXT;
+    nextval BIGINT;
+BEGIN
+    IF NEW.order_number IS NULL THEN
+        -- Get the 3-digit store number from franchisees
+        SELECT LPAD(store_number::text, 3, '0') INTO store_num FROM franchisees WHERE id = NEW.franchisee_id;
+        nextval := nextval('edible_order_seq');
+        NEW.order_number := 'W' || store_num || nextval::text || '-1';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+-- 3. Test: Insert a sample order and select the order_number
+-- (Assumes a valid customer_id, franchisee_id, recipient_address_id exist)
+-- INSERT INTO orders (customer_id, franchisee_id, recipient_address_id, status, fulfillment_type, subtotal, tax_amount, total_amount, scheduled_date, scheduled_time_slot) VALUES ('<customer_id>', '<franchisee_id>', '<recipient_address_id>', 'pending', 'delivery', 50.00, 5.00, 55.00, CURRENT_DATE, '2:00 PM - 4:00 PM');
+-- SELECT order_number FROM orders ORDER BY created_at DESC LIMIT 1; 

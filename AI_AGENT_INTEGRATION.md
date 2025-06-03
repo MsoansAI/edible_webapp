@@ -14,7 +14,10 @@ This guide shows exactly how to integrate AI agents with the Edible Arrangements
 | "under $50" | Price limit | Filtered Search | `/functions/v1/product-search` |
 | "my phone is 555-1234" | Phone number | Customer Lookup | `/functions/v1/customer-management` |
 | "zip code 02101" | Location | Store Finder | `/functions/v1/franchisee-inventory` |
-| "deliver to Mom at..." | Delivery address | Order Creation | `/functions/v1/create-order` |
+| "deliver to Mom at..." | Delivery address | Create Order | `/functions/v1/order` (POST) |
+| "what's my last order?" | Order lookup | Get Recent Order | `/functions/v1/order` (GET) |
+| "order number ending 0001" | Order number | Get Order by Number | `/functions/v1/order` (GET) |
+| "change delivery instructions" | Order update | Update Order | `/functions/v1/order` (PATCH) |
 
 ---
 
@@ -102,7 +105,7 @@ If Customer Not Found:
     "_internalId": "uuid-for-orders"
   },
   "orderHistory": [{
-    "orderNumber": "ORD-2025-000001",
+    "orderNumber": "W25710000001-1",
     "date": "Jun 1, 2025",
     "total": "$54.11",
     "status": "Delivered",
@@ -245,44 +248,71 @@ They offer delivery for $5.99 and are open until 6 PM today."
 
 ---
 
-## 📦 Function 4: Order Creation
-**Endpoint**: `POST /functions/v1/create-order`
+## 📦 Function 4: Unified Order Management
+**Endpoint**: `/functions/v1/order`
+**Methods**: `GET`, `POST`, `PATCH`
 
-### 🎤 What AI Should Collect
+### 🎤 What AI Should Ask/Collect
+
+**For Creating Orders (POST):**
 - Customer information (from customer-management)
 - Product selection (from product-search)
 - Store location (from store finder)
 - Delivery details or pickup preference
 - Special instructions
 
-### 📝 JSON Input Example
+**For Retrieving Orders (GET):**
+- "What's your most recent order?"
+- "What are the last 4 digits of your order number?"
+
+**For Updating Orders (PATCH):**
+- "What would you like to change about your order?"
+- "Any new delivery instructions?"
+
+### 📝 JSON Input Examples
+
+**GET: Retrieve Most Recent Order**
+```
+GET /functions/v1/order?customerId=customer-uuid&outputType=streamlined
+```
+
+**GET: Find Order by Last 4 Digits**
+```
+GET /functions/v1/order?orderNumber=0001&outputType=json
+```
+
+**POST: Create New Order**
 ```json
 {
-  "customer": {
-    "id": "customer-uuid",
-    "email": "john@email.com"
-  },
-  "store": {
-    "franchiseeId": "store-uuid"
-  },
-  "fulfillment": {
-    "type": "delivery",
-    "scheduledDate": "2025-05-10",
-    "timeSlot": "2:00 PM - 4:00 PM"
-  },
-  "delivery": {
-    "recipientName": "Mom",
-    "recipientPhone": "+15559876543",
-    "address": "123 Main St, Boston, MA 02101",
-    "instructions": "Ring doorbell twice"
-  },
+  "customerId": "customer-uuid",
+  "franchiseeId": "store-uuid",
   "items": [{
     "productId": "product-uuid",
     "optionId": "option-uuid",
     "quantity": 1,
     "addons": ["addon-uuid-1"]
   }],
-  "specialInstructions": "Include extra napkins"
+  "deliveryAddress": {
+    "street": "123 Main St",
+    "city": "Boston",
+    "state": "MA",
+    "zipCode": "02101",
+    "specialInstructions": "Ring doorbell twice"
+  },
+  "specialInstructions": "Include extra napkins",
+  "outputType": "streamlined"
+}
+```
+
+**PATCH: Update Existing Order**
+```json
+{
+  "orderId": "order-uuid",
+  "updates": {
+    "special_instructions": "Leave at back door",
+    "scheduled_time_slot": "3:00 PM - 5:00 PM"
+  },
+  "outputType": "streamlined"
 }
 ```
 
@@ -305,9 +335,88 @@ They offer delivery for $5.99 and are open until 6 PM today."
 6. AI: "What's your mom's address?"
    Customer: "123 Main St, Boston, MA 02101"
 
-7. → Call create-order API
+7. → Call POST /order API
 
-8. AI: "Perfect! Order ORD-2025-000123 confirmed for tomorrow 2-4 PM delivery!"
+8. AI: "Perfect! Order W25710000003-1 confirmed for tomorrow 2-4 PM delivery!"
+
+--- NEW CAPABILITIES ---
+
+9. Customer (later): "What was my last order?"
+   → Call GET /order?customerId=uuid
+
+10. Customer: "I need to change the delivery instructions"
+    → Call PATCH /order with updates
+
+11. Customer: "What's order ending in 0003?"
+    → Call GET /order?orderNumber=0003
+```
+
+### ✅ Response Formats
+
+**GET Response (Streamlined)**:
+```json
+{
+  "order": {
+    "orderNumber": "W25710000001-1",
+    "status": "pending",
+    "total": "$54.11",
+    "estimatedDelivery": "Tomorrow 2-4 PM",
+    "items": [{
+      "product": "Chocolate Strawberries Box",
+      "price": "$49.99",
+      "quantity": 1,
+      "addons": ["Greeting Card ($4.99)"]
+    }],
+    "delivery": {
+      "address": "123 Main St, Boston, MA",
+      "instructions": "Ring doorbell"
+    }
+  },
+  "summary": "Found order W25710000001-1 for you."
+}
+```
+
+**POST Response (Order Creation)**:
+```json
+{
+  "order": {
+    "orderNumber": "W25710000003-1",
+    "total": "$59.98",
+    "estimatedDelivery": "Tomorrow 2-4 PM",
+    "items": [{
+      "product": "Chocolate Strawberries Box",
+      "price": "$54.99",
+      "quantity": 1
+    }],
+    "delivery": {
+      "address": "123 Main St, Boston, MA",
+      "instructions": "Ring doorbell twice"
+    }
+  },
+  "confirmation": "Perfect! Order W25710000003-1 confirmed for $59.98. Delivering tomorrow 2-4 PM to 123 Main St."
+}
+```
+
+**PATCH Response (Order Update)**:
+```json
+{
+  "order": {
+    "orderNumber": "W25710000001-1",
+    "status": "pending",
+    "total": "$54.11",
+    "estimatedDelivery": "June 5, 3-5 PM"
+  },
+  "summary": "Order W25710000001-1 updated successfully."
+}
+```
+
+**Error Handling for Updates**:
+```json
+{
+  "error": "Order cannot be modified",
+  "message": "Order W25710000001-1 is shipped and cannot be modified.",
+  "currentStatus": "shipped"
+}
 ```
 
 ---
