@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "eslint-plugin-react-you-might-not-need-an-effect": "^0.0.39"
+  }
+}
