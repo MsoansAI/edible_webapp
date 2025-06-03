@@ -1,0 +1,319 @@
+# Edible Arrangements - Project .gitignore
+
+# ========================
+# 🔐 SENSITIVE & SECRETS
+# ========================
+
+# Environment variables and configuration
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
+*.env
+
+# Supabase credentials and keys
+supabase/.env
+.supabase/
+supabase/config.toml
+**/supabase-service-role-key*
+**/supabase-anon-key*
+
+# API keys and secrets
+**/api-keys*
+**/secrets*
+**/*secret*
+**/*key*
+config/secrets*
+credentials.json
+service-account*.json
+
+# Database and connection strings
+**/*connection-string*
+**/*database-url*
+**/*postgres-password*
+
+# ========================
+# 📦 NODE.JS & NPM
+# ========================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage
+.grunt
+
+# Bower dependency directory
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+build/Release
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ========================
+# 🤖 AI & VOICE PLATFORMS
+# ========================
+
+# OpenAI API keys
+openai-key*
+**/openai*secret*
+
+# VAPI credentials
+vapi-*
+**/vapi-config*
+
+# VoiceFlow exports and backups
+voiceflow-*
+*.vf
+
+# N8n workflows (if containing sensitive data)
+n8n-workflows-backup*
+**/n8n-sensitive*
+
+# ========================
+# 🛠️ DEVELOPMENT & BUILD
+# ========================
+
+# Build outputs
+build/
+dist/
+out/
+.output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Log files
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ========================
+# 📊 DATA & TESTING
+# ========================
+
+# Test data with real customer information
+test-data-real*
+**/real-customer-data*
+**/production-export*
+
+# Database dumps and backups
+*.sql.backup
+*.dump
+**/db-backup*
+**/database-export*
+
+# CSV files with real data (keep sample data)
+**/real-*.csv
+**/production-*.csv
+**/customer-export-*.csv
+
+# ========================
+# 🚀 DEPLOYMENT & CLOUD
+# ========================
+
+# Serverless Framework
+.serverless/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+
+# Docker
+.dockerignore
+Dockerfile.local
+
+# Vercel
+.vercel
+
+# Netlify
+.netlify
+
+# ========================
+# 📱 PLATFORM SPECIFIC
+# ========================
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ========================
+# 🔍 MISC
+# ========================
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# IDE/Editor specific
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# Package managers
+package-lock.json.backup
+yarn.lock.backup
+
+# Custom project files
+TODO.md
+NOTES.md
+SCRATCH.md
+
+# ========================
+# 📝 DOCUMENTATION DRAFTS
+# ========================
+
+# Keep published docs, ignore drafts
+**/DRAFT-*
+**/WIP-*
+**/TODO-*
+**/*-DRAFT.md
+**/*-WIP.md
+
+# ========================
+# 🧪 TESTING & SAMPLES
+# ========================
+
+# Keep sample files, ignore test outputs
+test-output/
+test-results/
+coverage-reports/
+
+# Keep samples/ directory but ignore sensitive test data
+!samples/
+samples/**/real-*
+samples/**/production-* 
