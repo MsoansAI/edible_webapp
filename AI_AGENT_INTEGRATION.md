@@ -583,4 +583,79 @@ function getNextSuggestion(context) {
 
 ---
 
-**🚀 Ready to Build**: Everything you need to create a production-ready AI voice agent! 
+**🚀 Ready to Build**: Everything you need to create a production-ready AI voice agent!
+
+## 🛠️ Example: PATCH /functions/v1/order with curl
+
+Below are example curl commands for updating an order using the PATCH method. Adjust the payload according to the type of change you want to make.
+
+### 1. Change Delivery Address
+```bash
+curl -X PATCH https://<YOUR_PROJECT>.functions.supabase.co/functions/v1/order \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "<order-uuid>",
+    "updates": {
+      "delivery_address": {
+        "street": "456 Oak Ave",
+        "city": "Cambridge",
+        "state": "MA",
+        "zipCode": "02139",
+        "specialInstructions": "Leave at front desk"
+      }
+    },
+    "outputType": "streamlined"
+  }'
+```
+
+### 2. Change Delivery Time (Date/Time Slot)
+```bash
+curl -X PATCH https://<YOUR_PROJECT>.functions.supabase.co/functions/v1/order \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "<order-uuid>",
+    "updates": {
+      "scheduled_date": "2025-06-05",
+      "scheduled_time_slot": "4:00 PM - 6:00 PM"
+    },
+    "outputType": "streamlined"
+  }'
+```
+
+### 3. Change Pickup Time
+```bash
+curl -X PATCH https://<YOUR_PROJECT>.functions.supabase.co/functions/v1/order \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "<order-uuid>",
+    "updates": {
+      "scheduled_date": "2025-06-06",
+      "scheduled_time_slot": "11:00 AM - 12:00 PM"
+    },
+    "outputType": "streamlined"
+  }'
+```
+
+### 4. Change Pickup Customer Name
+```bash
+curl -X PATCH https://<YOUR_PROJECT>.functions.supabase.co/functions/v1/order \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "<order-uuid>",
+    "updates": {
+      "pickup_customer_name": "Jane Smith"
+    },
+    "outputType": "streamlined"
+  }'
+```
+
+**Notes:**
+- Only include the fields you want to update in the `updates` object.
+- For delivery orders, use `delivery_address` and/or `scheduled_date`, `scheduled_time_slot`.
+- For pickup orders, use `pickup_customer_name`, `scheduled_date`, `scheduled_time_slot`.
+- The `outputType` parameter is optional; use `"streamlined"` for a simplified response or `"json"` for the full order object.
+- Replace `<YOUR_PROJECT>`, `<YOUR_TOKEN>`, and `<order-uuid>` with your actual values. 
