@@ -13,6 +13,7 @@ This guide covers all production edge functions, their purposes, input/output fo
 | **`product-search`** | AI-optimized product discovery & filtering | 30/min | ✅ **ACTIVE** |
 | **`order`** | Unified order management (create/retrieve/update) | 20/min | ✅ **ACTIVE** |
 | **`franchisee-inventory`** | Store location & inventory management | 15/min | ✅ **ACTIVE** |
+| **`order-items`** | Manage order items - add, update, remove items and addons | 15/min | ✅ **ACTIVE** |
 
 ---
 
@@ -485,3 +486,155 @@ GROUP BY endpoint;
 ---
 
 **🎯 Production Status**: All functions tested and production-ready with enterprise security! 
+
+### Function 5: Order Items Management (PATCH /order-items)
+
+**Purpose**: Manage order items with add, update, and remove operations, including addon management and automatic total recalculation.
+
+**Endpoint**: `PATCH /functions/v1/order-items`
+
+**Rate Limit**: 15 requests per minute
+
+**Request Format**:
+```json
+{
+  "orderId": "uuid-string",
+  "items": [
+    {
+      "action": "add",
+      "productId": "uuid-string",
+      "productOptionId": "uuid-string", // optional
+      "quantity": 2,
+      "addons": [
+        {
+          "addonId": "uuid-string",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "action": "update", 
+      "itemId": "uuid-string", // order_items.id
+      "quantity": 3,
+      "addons": [
+        {
+          "addonId": "uuid-string",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "action": "remove",
+      "itemId": "uuid-string"
+    }
+  ],
+  "outputType": "streamlined" // or "json"
+}
+```
+
+**Key Features**:
+- **Add Items**: Add new products with optional variants and addons
+- **Update Items**: Change quantities and addon selections
+- **Remove Items**: Delete items and their associated addons
+- **Automatic Calculations**: Totals, subtotals, and tax recalculated automatically
+- **Status Protection**: Cannot modify shipped or delivered orders
+- **Data Integrity**: Updates normalized tables, triggers sync to flat tables
+
+**Response Formats**:
+
+**Streamlined Response**:
+```json
+{
+  "order": {
+    "orderNumber": "W25710000003-1",
+    "status": "pending",
+    "total": "$91.97",
+    "subtotal": "$84.96", 
+    "tax": "$7.01",
+    "itemCount": 2,
+    "items": [
+      {
+        "product": "Tropical Paradise Arrangement",
+        "option": null,
+        "price": "$39.99",
+        "quantity": 1,
+        "total": "$39.99",
+        "addons": ["Greeting Card (1x)"]
+      },
+      {
+        "product": "Classic Fruit Basket",
+        "option": null, 
+        "price": "$29.99",
+        "quantity": 1,
+        "total": "$29.99",
+        "addons": ["Balloon Bundle (1x)"]
+      }
+    ],
+    "delivery": {
+      "address": "789 NEW ADDRESS St, Cambridge, MA 02139",
+      "instructions": "UPDATED: Ring doorbell TWICE"
+    }
+  },
+  "summary": "Order W25710000003-1 items updated successfully. New total: $91.97"
+}
+```
+
+**JSON Response**:
+```json
+{
+  "order": {
+    "order_id": "uuid-string",
+    "order_data": { /* full chatbot_orders_flat record */ },
+    "last_updated": "2025-01-31T15:47:51.623Z"
+  },
+  "orderId": "uuid-string",
+  "lastUpdated": "2025-01-31T15:47:51.623Z",
+  "summary": "Order W25710000003-1 items updated successfully. New total: $91.97"
+}
+```
+
+**Item Actions Explained**:
+
+1. **Add Action**:
+   - Requires: `productId`, `quantity`
+   - Optional: `productOptionId`, `addons`
+   - Validates product/option exists and is active
+   - Calculates pricing based on product or option price
+   - Adds item to `order_items` table
+   - Adds addons to `order_addons` table
+
+2. **Update Action**:
+   - Requires: `itemId` (from order_items table)
+   - Optional: `quantity`, `addons`
+   - Validates item belongs to the order
+   - Updates quantity and recalculates item total
+   - Replaces all addons if addons array provided
+
+3. **Remove Action**:
+   - Requires: `itemId`
+   - Validates item belongs to the order
+   - Removes addons first (foreign key constraint)
+   - Removes item from order
+
+**Error Handling**:
+- `400`: Missing required fields, invalid actions, product not found
+- `404`: Order not found, item not found in order
+- `405`: Invalid HTTP method (only PATCH allowed)
+- `429`: Rate limit exceeded (15/min)
+- `500`: Database errors, calculation failures
+
+**Order Modification Restrictions**:
+- Orders with status 'shipped' or 'delivered' cannot be modified
+- Returns detailed error message with current status
+
+**Database Integration**:
+- Updates normalized tables (`orders`, `order_items`, `order_addons`)
+- Triggers automatically update `chatbot_orders_flat` for AI consistency
+- Maintains referential integrity and proper foreign key relationships
+
+**Pricing Logic**:
+- Uses `products.base_price` by default
+- Uses `product_options.price` if productOptionId specified
+- Addon pricing from `addons.price` table
+- Tax calculated at 8.25% (configurable)
+- All calculations preserve decimal precision 

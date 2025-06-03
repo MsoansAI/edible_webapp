@@ -18,6 +18,9 @@ This guide shows exactly how to integrate AI agents with the Edible Arrangements
 | "what's my last order?" | Order lookup | Get Recent Order | `/functions/v1/order` (GET) |
 | "order number ending 0001" | Order number | Get Order by Number | `/functions/v1/order` (GET) |
 | "change delivery instructions" | Order update | Update Order | `/functions/v1/order` (PATCH) |
+| **Order Retrieval**    | `GET /order?customerId=uuid&outputType=streamlined`     | Get customer's most recent order                    |
+| **Order Updates**      | `PATCH /order` with `orderId` and `updates` object      | Update delivery address, time, instructions        |
+| **Item Management**    | `PATCH /order-items` with `orderId` and `items` array   | Add, update, or remove items from orders          |
 
 ---
 
@@ -421,6 +424,195 @@ GET /functions/v1/order?orderNumber=0001&outputType=json
 
 ---
 
+## 🛠️ Function 6: Order Item Management
+
+**Purpose**: Add, update, or remove items from existing orders with automatic total recalculation.
+
+**When to Use**:
+- Customer wants to add more items to their order
+- Customer wants to change quantities of existing items
+- Customer wants to remove items from their order
+- Customer wants to modify addon selections
+
+### Request Structure
+```json
+{
+  "orderId": "uuid-from-previous-order-call",
+  "items": [
+    {
+      "action": "add",
+      "productId": "product-uuid",
+      "quantity": 2,
+      "addons": [{"addonId": "addon-uuid", "quantity": 1}]
+    },
+    {
+      "action": "update",
+      "itemId": "order-item-uuid",
+      "quantity": 3
+    },
+    {
+      "action": "remove", 
+      "itemId": "order-item-uuid"
+    }
+  ],
+  "outputType": "streamlined"
+}
+```
+
+### AI Conversation Patterns
+
+**Adding Items to Order**:
+```
+User: "Can I add a fruit basket to my order?"
+AI: "I'll add a Classic Fruit Basket to your current order."
+
+→ Call product-search to find fruit basket
+→ Call order-items with add action
+→ "Perfect! I've added the Classic Fruit Basket ($29.99) to your order. Your new total is $78.68."
+```
+
+**Updating Item Quantities**:
+```
+User: "Actually, make that 3 chocolate strawberry boxes instead of 1"
+AI: "I'll update your chocolate strawberries to 3 boxes."
+
+→ Call order-items with update action using itemId
+→ "Updated! You now have 3 Chocolate Strawberry Boxes. Your new total is $164.97."
+```
+
+**Removing Items**:
+```
+User: "Remove the balloon from my order"
+AI: "I'll remove the balloon bundle from your order."
+
+→ Call order-items with remove action
+→ "Done! I've removed the Balloon Bundle. Your new total is $54.98."
+```
+
+### Response Handling
+```javascript
+// Streamlined response for conversational AI
+{
+  "order": {
+    "orderNumber": "W25710000003-1",
+    "total": "$91.97",
+    "itemCount": 2,
+    "items": [
+      {
+        "product": "Tropical Paradise Arrangement",
+        "quantity": 1,
+        "total": "$39.99",
+        "addons": ["Greeting Card (1x)"]
+      }
+    ]
+  },
+  "summary": "Order W25710000003-1 items updated successfully. New total: $91.97"
+}
+```
+
+### Error Scenarios
+- **Order shipped/delivered**: "I'm sorry, but order W25710000003-1 has already shipped and items cannot be modified."
+- **Product not found**: "I couldn't find that product. Let me help you search for something similar."
+- **Item not in order**: "That item isn't in your current order. Would you like me to add it instead?"
+
+## 📋 Complete cURL Examples
+
+### 6. Item Management Examples
+
+**Add Items to Order**:
+```bash
+curl -X PATCH "https://your-project.supabase.co/functions/v1/order-items" \
+  -H "Authorization: Bearer YOUR_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "order-uuid",
+    "items": [
+      {
+        "action": "add",
+        "productId": "product-uuid",
+        "quantity": 2,
+        "addons": [
+          {
+            "addonId": "addon-uuid",
+            "quantity": 1
+          }
+        ]
+      }
+    ],
+    "outputType": "streamlined"
+  }'
+```
+
+**Update Item Quantity**:
+```bash
+curl -X PATCH "https://your-project.supabase.co/functions/v1/order-items" \
+  -H "Authorization: Bearer YOUR_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "order-uuid",
+    "items": [
+      {
+        "action": "update",
+        "itemId": "order-item-uuid",
+        "quantity": 3,
+        "addons": [
+          {
+            "addonId": "new-addon-uuid",
+            "quantity": 2
+          }
+        ]
+      }
+    ],
+    "outputType": "streamlined"
+  }'
+```
+
+**Remove Items**:
+```bash
+curl -X PATCH "https://your-project.supabase.co/functions/v1/order-items" \
+  -H "Authorization: Bearer YOUR_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "order-uuid",
+    "items": [
+      {
+        "action": "remove",
+        "itemId": "order-item-uuid"
+      }
+    ],
+    "outputType": "streamlined"
+  }'
+```
+
+**Multiple Actions in One Request**:
+```bash
+curl -X PATCH "https://your-project.supabase.co/functions/v1/order-items" \
+  -H "Authorization: Bearer YOUR_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "order-uuid",
+    "items": [
+      {
+        "action": "add",
+        "productId": "new-product-uuid",
+        "quantity": 1
+      },
+      {
+        "action": "update",
+        "itemId": "existing-item-uuid",
+        "quantity": 2
+      },
+      {
+        "action": "remove",
+        "itemId": "unwanted-item-uuid"
+      }
+    ],
+    "outputType": "streamlined"
+  }'
+```
+
+---
+
 ## 🛡️ Security & Rate Limiting for AI Agents
 
 ### Authentication
@@ -653,9 +845,25 @@ curl -X PATCH https://<YOUR_PROJECT>.functions.supabase.co/functions/v1/order \
   }'
 ```
 
+### 5. Change Special Instructions
+```bash
+curl -X PATCH https://<YOUR_PROJECT>.functions.supabase.co/functions/v1/order \
+  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "orderId": "<order-uuid>",
+    "updates": {
+      "special_instructions": "Please include extra napkins"
+    },
+    "outputType": "streamlined"
+  }'
+```
+
 **Notes:**
 - Only include the fields you want to update in the `updates` object.
-- For delivery orders, use `delivery_address` and/or `scheduled_date`, `scheduled_time_slot`.
-- For pickup orders, use `pickup_customer_name`, `scheduled_date`, `scheduled_time_slot`.
+- For delivery orders, use `delivery_address` object with `street`, `city`, `state`, `zipCode`, `specialInstructions`
+- For time changes (both delivery and pickup), use `scheduled_date` and `scheduled_time_slot`
+- For pickup orders, you can also update `pickup_customer_name`
 - The `outputType` parameter is optional; use `"streamlined"` for a simplified response or `"json"` for the full order object.
+- **Architecture**: Updates are applied to normalized tables (`orders`, `recipient_addresses`) and automatically synchronized to flat tables via database triggers.
 - Replace `<YOUR_PROJECT>`, `<YOUR_TOKEN>`, and `<order-uuid>` with your actual values. 
