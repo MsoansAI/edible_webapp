@@ -1,0 +1,271 @@
+{
+  "tools": [
+    {
+      "name": "getProductRecommendations",
+      "description": "Search for products based on customer needs and preferences",
+      "type": "api",
+      "endpoint": {
+        "method": "POST",
+        "url": "{{SUPABASE_URL}}/functions/v1/product-search",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{SUPABASE_ANON_KEY}}"
+        }
+      },
+      "parameters": {
+        "query": {
+          "type": "string",
+          "description": "Natural language description of what customer wants",
+          "required": false
+        },
+        "priceRange": {
+          "type": "string",
+          "enum": ["budget", "mid", "premium"],
+          "description": "Price category preference",
+          "required": false
+        },
+        "allergens": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of allergens to avoid",
+          "required": false
+        },
+        "franchiseeId": {
+          "type": "string",
+          "description": "Store ID for inventory checking",
+          "required": false
+        },
+        "occasion": {
+          "type": "string",
+          "description": "Special occasion context",
+          "required": false
+        },
+        "limit": {
+          "type": "integer",
+          "default": 3,
+          "description": "Maximum number of results",
+          "required": false
+        }
+      },
+      "response_mapping": {
+        "products": "response.products",
+        "count": "response.count",
+        "summary": "response.summary",
+        "searchMethod": "response.searchMethod"
+      }
+    },
+    {
+      "name": "postOrder",
+      "description": "Create a pending order in the system",
+      "type": "api",
+      "endpoint": {
+        "method": "POST",
+        "url": "{{SUPABASE_URL}}/functions/v1/order",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{SUPABASE_ANON_KEY}}"
+        }
+      },
+      "parameters": {
+        "customerId": {
+          "type": "string",
+          "description": "Internal customer UUID",
+          "required": true
+        },
+        "franchiseeId": {
+          "type": "string", 
+          "description": "Internal store UUID",
+          "required": true
+        },
+        "fulfillmentType": {
+          "type": "string",
+          "enum": ["delivery", "pickup"],
+          "default": "delivery",
+          "required": true
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "type": "string",
+                "description": "4-digit product ID or UUID"
+              },
+              "optionName": {
+                "type": "string",
+                "description": "Human-readable option name"
+              },
+              "quantity": {
+                "type": "integer",
+                "default": 1
+              },
+              "addons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "addonName": {
+                      "type": "string"
+                    },
+                    "quantity": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "deliveryAddress": {
+          "type": "object",
+          "properties": {
+            "recipientName": {
+              "type": "string",
+              "required": true
+            },
+            "recipientPhone": {
+              "type": "string"
+            },
+            "streetAddress": {
+              "type": "string",
+              "required": true
+            },
+            "city": {
+              "type": "string",
+              "required": true
+            },
+            "state": {
+              "type": "string",
+              "required": true
+            },
+            "zipCode": {
+              "type": "string",
+              "required": true
+            },
+            "deliveryInstructions": {
+              "type": "string"
+            }
+          },
+          "required": false
+        },
+        "scheduledDate": {
+          "type": "string",
+          "format": "date",
+          "description": "YYYY-MM-DD format",
+          "required": false
+        },
+        "scheduledTimeSlot": {
+          "type": "string",
+          "description": "Time preference for delivery/pickup",
+          "required": false
+        },
+        "specialInstructions": {
+          "type": "string",
+          "description": "Gift message or special notes",
+          "required": false
+        }
+      },
+      "response_mapping": {
+        "orderNumber": "response.order.orderNumber",
+        "total": "response.order.total",
+        "confirmation": "response.confirmation",
+        "estimatedDelivery": "response.order.estimatedDelivery"
+      }
+    },
+    {
+      "name": "checkUserProfile",
+      "description": "Get customer information and preferences",
+      "type": "api",
+      "endpoint": {
+        "method": "POST",
+        "url": "{{SUPABASE_URL}}/functions/v1/customer-management",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{SUPABASE_ANON_KEY}}"
+        }
+      },
+      "parameters": {
+        "phone": {
+          "type": "string",
+          "description": "Customer phone number",
+          "required": false
+        },
+        "email": {
+          "type": "string",
+          "description": "Customer email address", 
+          "required": false
+        },
+        "firstName": {
+          "type": "string",
+          "required": false
+        },
+        "lastName": {
+          "type": "string",
+          "required": false
+        },
+        "source": {
+          "type": "string",
+          "default": "chatbot",
+          "required": true
+        }
+      },
+      "response_mapping": {
+        "customerId": "response.customer._internalId",
+        "customerName": "response.customer.name",
+        "allergies": "response.customer.allergies",
+        "isNewAccount": "response.customer.isNewAccount",
+        "orderHistory": "response.orderHistory",
+        "summary": "response.summary"
+      }
+    }
+  ],
+  "paths": [
+    {
+      "name": "showProductCards",
+      "description": "Display product recommendations in carousel format",
+      "type": "component",
+      "trigger_condition": "after_getProductRecommendations_success",
+      "component_type": "carousel",
+      "data_source": "getProductRecommendations.products",
+      "card_template": {
+        "title": "{{name}}",
+        "subtitle": "{{price}}",
+        "description": "{{description}}",
+        "image": "{{imageUrl}}",
+        "actions": [
+          {
+            "type": "select",
+            "label": "Choose This",
+            "value": "{{productId}}"
+          }
+        ]
+      },
+      "return_variable": "carousel_selection"
+    },
+    {
+      "name": "endPath", 
+      "description": "Complete the ordering process",
+      "type": "completion",
+      "trigger_condition": "after_postOrder_success",
+      "actions": [
+        {
+          "type": "set_variable",
+          "name": "order_completed",
+          "value": true
+        },
+        {
+          "type": "send_confirmation",
+          "template": "order_confirmation_email"
+        },
+        {
+          "type": "end_conversation",
+          "message": "Thank you for your order! You'll receive confirmation details shortly."
+        }
+      ]
+    }
+  ]
+} 
