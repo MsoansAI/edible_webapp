@@ -8,6 +8,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Edible Arrangements",
   description: "Fresh fruit arrangements, chocolate dipped fruits, and more",
+  keywords: ["fruit arrangements", "edible arrangements", "gift baskets", "chocolate strawberries"],
 }
 
 export default function RootLayout({
@@ -17,8 +18,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <Providers>{children}</Providers>
+      <body className={`${inter.className} min-h-screen bg-background font-sans antialiased`}>
+        <div className="relative flex min-h-screen flex-col">
+          <Providers>{children}</Providers>
+        </div>
       </body>
     </html>
   )
