@@ -5,22 +5,34 @@ import { createClient } from "@/lib/supabase/client"
 import { ProductCard } from "./product-card"
 
 export function FeaturedProducts() {
-  const supabase = createClient()
-  
-  const { data: products, isLoading } = useQuery({
+  const { data: products, isLoading, error } = useQuery({
     queryKey: ["featuredProducts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(6)
-      
-      if (error) throw error
-      return data
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(6)
+        
+        if (error) throw error
+        return data
+      } catch (err) {
+        console.error("Error fetching products:", err)
+        throw err
+      }
     }
   })
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-500 bg-red-50 rounded-lg">
+        <p>Error loading products. Please check your Supabase configuration.</p>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
