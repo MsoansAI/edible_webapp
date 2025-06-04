@@ -12,6 +12,8 @@
 .env.production
 .env.staging
 *.env
+venv/
+samples/
 
 # Supabase credentials and keys
 supabase/.env
@@ -316,4 +318,4 @@ coverage-reports/
 # Keep samples/ directory but ignore sensitive test data
 !samples/
 samples/**/real-*
-samples/**/production-* 
+samples/**/production-* .env.local

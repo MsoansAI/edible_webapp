@@ -1,151 +1,221 @@
-# 🛍️ Edible Arrangements AI-Driven E-commerce Platform
+# Edible Arrangements Voiceflow Integration
 
-## Overview
+A complete backend system for an Edible Arrangements chatbot built with Voiceflow, featuring AI-powered product search, advanced order management, and customer account handling.
 
-A comprehensive Supabase-powered e-commerce platform for Edible Arrangements featuring AI chatbot integration, dual-optimized database architecture, and enterprise-grade security.
+## 🏗️ Architecture Overview
 
-## 🏗️ Architecture
+This system consists of:
+- **Supabase PostgreSQL Database**: Normalized schema with performance-optimized flat tables
+- **Edge Functions**: Serverless API endpoints for chatbot integration 
+- **AI Integration**: OpenAI embeddings for semantic product search
+- **Voiceflow Integration**: RESTful APIs optimized for conversational interfaces
 
-- **Database**: 21-table structure (17 normalized + 4 AI-optimized flat tables)
-- **Edge Functions**: 4 production-ready APIs for all operations
-- **Security**: Row-level security with intelligent rate limiting
-- **AI Integration**: Optimized for voice assistants and chatbots
+## 📁 Project Structure
 
-### Database Architecture Overview
-
-```mermaid
-graph TB
-    subgraph "🛍️ Products & Catalog (7 tables)"
-        P[products] --> PO[product_options]
-        P --> PI[product_ingredients]
-        P --> PC[product_categories]
-        PI --> I[ingredients]
-        PC --> C[categories]
-        A[addons]
-    end
-    
-    subgraph "👥 Customers & Addresses (3 tables)"
-        CU[customers] --> CA[customer_addresses]
-        CU --> RA[recipient_addresses]
-    end
-    
-    subgraph "📦 Orders (4 tables)"
-        O[orders] --> OI[order_items]
-        O --> OSH[order_status_history]
-        OI --> OA[order_addons]
-    end
-    
-    subgraph "🏪 Business (3 tables)"
-        F[franchisees] --> INV[inventory]
-        ARL[api_rate_limits]
-    end
-    
-    subgraph "🤖 AI-Optimized Flat Tables (4 tables)"
-        CPF[chatbot_products_flat]
-        CCF[chatbot_customers_flat]
-        COF[chatbot_orders_flat]
-        CFF[chatbot_franchisees_flat]
-    end
-    
-    %% Key Relationships
-    CU --> O
-    F --> O
-    P --> OI
-    P --> INV
-    RA --> O
-    A --> OA
-    
-    %% AI Sync (automatic triggers)
-    P -.-> CPF
-    CU -.-> CCF
-    O -.-> COF
-    F -.-> CFF
-    
-    style CPF fill:#e1f5fe
-    style CCF fill:#e1f5fe
-    style COF fill:#e1f5fe
-    style CFF fill:#e1f5fe
 ```
-
-## 📚 Documentation Structure
-
-### Core System Documentation
-- **[DATABASE_STRUCTURE.md](DATABASE_STRUCTURE.md)** - Complete database schema, tables, and relationships
-- **[EDGE_FUNCTIONS_GUIDE.md](EDGE_FUNCTIONS_GUIDE.md)** - API endpoints and integration details
-- **[SECURITY_GUIDE.md](SECURITY_GUIDE.md)** - Security policies and rate limiting
-
-### Integration Guides
-- **[AI_AGENT_INTEGRATION.md](AI_AGENT_INTEGRATION.md)** - How to integrate AI agents and chatbots
-- **[CUSTOMER_MANAGEMENT.md](CUSTOMER_MANAGEMENT.md)** - Account management and conflict resolution
-
-### Configuration & Credentials
-- **[SUPABASE_SETUP.md](SUPABASE_SETUP.md)** - Project credentials and connection details
-
-### Implementation History
-- **[MOTHERS_DAY_IMPORT.md](MOTHERS_DAY_IMPORT.md)** - Real product data import example
-
-### Documentation Navigation Flow
-
-```mermaid
-flowchart TD
-    START([👋 Start Here: README.md]) --> DB{Need Database Understanding?}
-    
-    DB -->|Yes| DBD[📊 DATABASE_STRUCTURE.md<br/>Complete Schema Reference]
-    DB -->|No| SETUP[🔧 SUPABASE_SETUP.md<br/>Get Connected]
-    
-    DBD --> SETUP
-    
-    SETUP --> APIS[🚀 EDGE_FUNCTIONS_GUIDE.md<br/>Learn the 4 APIs]
-    
-    APIS --> GOAL{What's Your Goal?}
-    
-    GOAL -->|Build AI Chatbot| AI[🤖 AI_AGENT_INTEGRATION.md<br/>Voice Assistant Integration]
-    GOAL -->|Handle Accounts| CUST[👥 CUSTOMER_MANAGEMENT.md<br/>Account Conflict Resolution]
-    GOAL -->|Production Deploy| SEC[🔒 SECURITY_GUIDE.md<br/>Enterprise Security]
-    GOAL -->|Import Data| IMP[📊 MOTHERS_DAY_IMPORT.md<br/>Real Data Import Example]
-    
-    AI --> PROD{Ready for Production?}
-    CUST --> PROD
-    IMP --> PROD
-    
-    PROD -->|Yes| SEC
-    PROD -->|No| APIS
-    
-    SEC --> DONE([🎉 Production Ready!])
-    
-    style START fill:#e8f5e8
-    style DONE fill:#e8f5e8
-    style DB fill:#fff3e0
-    style GOAL fill:#fff3e0
-    style PROD fill:#fff3e0
+├── docs/                          # Comprehensive documentation
+│   ├── SYSTEM_OVERVIEW.md         # Complete system diagrams and architecture
+│   ├── ARCHITECTURE.md            # System architecture overview
+│   ├── DATABASE_STRUCTURE.md      # Database schema documentation
+│   ├── EDGE_FUNCTIONS_GUIDE.md    # API endpoint documentation
+│   ├── SUPABASE_SETUP.md          # Setup and deployment guide
+│   ├── CUSTOMER_MANAGEMENT.md     # Customer account system docs
+│   ├── SECURITY_GUIDE.md          # Security and rate limiting
+│   └── AI_AGENT_INTEGRATION.md    # AI agent configuration
+├── supabase/                      # Supabase configuration
+│   └── functions/                 # Edge function source code
+├── voiceflow/                     # Voiceflow integration examples
+│   ├── README.md                  # Integration guide
+│   └── api-examples.js            # Reusable API code snippets
+├── tests/                         # Test files (if any)
+├── scripts/                       # Utility scripts (if any)
+└── package.json                   # Node.js dependencies
 ```
-
----
 
 ## 🚀 Quick Start
 
-1. **Database Connection**: See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for credentials
-2. **API Integration**: Check [EDGE_FUNCTIONS_GUIDE.md](EDGE_FUNCTIONS_GUIDE.md) for endpoints
-3. **AI Agent Setup**: Follow [AI_AGENT_INTEGRATION.md](AI_AGENT_INTEGRATION.md) for chatbot integration
+### Prerequisites
+- Supabase account with project setup
+- OpenAI API key for semantic search
+- Node.js for any local development
 
-## 💼 Production Ready
+### Environment Variables
+```bash
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+OPENAI_API_KEY=your_openai_api_key
+```
 
-✅ **Fully Deployed**: All systems tested and operational  
-✅ **Enterprise Security**: RLS policies and rate limiting active  
-✅ **AI Optimized**: Flat tables for single-query chatbot operations  
-✅ **Sample Data**: Products, customers, and orders ready for testing
+### Database Setup
+1. Follow `docs/SUPABASE_SETUP.md` for complete database initialization
+2. Import the schema and initial data
+3. Configure Row Level Security (RLS) policies
+
+### Edge Functions Deployment
+All edge functions are deployed and active:
+- `product-search` (v14) - AI-powered product search
+- `customer-management` (v4) - Customer account handling  
+- `franchisee-inventory` (v8) - Store location services
+- `order` (v16) - Complete order management
+- `order-items` (v9) - Advanced order item manipulation
+- `generate-embedding` (v5) - AI embedding generation
+
+## 🎯 Core Features
+
+### AI-Powered Product Search
+- **Level 1**: Direct 4-digit product ID lookup
+- **Level 2**: Structured database search with filters
+- **Level 3**: Semantic search using OpenAI embeddings
+- Price range filtering, allergen awareness, inventory checking
+
+### Advanced Order Management
+- Smart item addition (prevents duplicates)
+- Partial quantity removal support
+- Cancellation prevention with live agent redirect
+- Real-time price calculations with tax
+- Support for delivery and pickup orders
+
+### Customer Account System
+- Multi-source account unification (chatbot, web, phone)
+- Duplicate detection and prevention
+- Allergy and preference management
+- Order history tracking
+
+### Store Management
+- ZIP code-based store finding
+- Real-time inventory checking
+- Operating hours management
+- Delivery zone validation
+
+## 🔧 API Endpoints
+
+### Product Search
+```http
+POST /functions/v1/product-search
+Content-Type: application/json
+
+{
+  "query": "birthday arrangement",
+  "priceRange": "mid",
+  "allergens": ["nuts"],
+  "franchiseeId": "store-uuid"
+}
+```
+
+### Order Management
+```http
+POST /functions/v1/order
+Content-Type: application/json
+
+{
+  "customerId": "customer-uuid",
+  "franchiseeId": "store-uuid", 
+  "items": [
+    {
+      "productId": "3075",
+      "quantity": 1,
+      "optionName": "Large"
+    }
+  ],
+  "deliveryAddress": { ... }
+}
+```
+
+### Order Item Modification
+```http
+PATCH /functions/v1/order-items
+Content-Type: application/json
+
+{
+  "orderNumber": "W25710000001-1",
+  "items": [
+    {
+      "action": "add",
+      "productId": "3075", 
+      "optionName": "Large",
+      "quantity": 2
+    }
+  ]
+}
+```
+
+## 📊 Business Logic
+
+### Order Numbers
+Format: `W[store_number][sequence]-1`
+- Example: `W25710000001-1`
+- Designed for phone conversations and easy reference
+
+### Pricing
+- Base product price + option price
+- 8.25% tax rate
+- Precise decimal calculations
+- Real-time total updates
+
+### Customer-Friendly Design
+- 4-digit product IDs for voice communication
+- Human-readable option names ("Large", "Birthday")
+- Conversational error messages
+- Streamlined API responses for chatbots
+
+## 🔒 Security & Performance
+
+### Rate Limiting
+- IP-based rate limiting per endpoint
+- Different limits for different operation types
+- Automatic cleanup of expired limits
+
+### Data Security
+- Row Level Security (RLS) on all tables
+- Input validation and sanitization
+- Service-role authentication for edge functions
+
+### Performance Optimization
+- Flat table architecture for fast queries
+- Vector indexing for semantic search
+- Minimal API response sizes
+- Efficient database triggers
+
+## 📖 Documentation
+
+For detailed information, see the `/docs` directory:
+
+- **[SYSTEM_OVERVIEW.md](docs/SYSTEM_OVERVIEW.md)** - Complete system diagrams and data flow
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Complete system architecture
+- **[DATABASE_STRUCTURE.md](docs/DATABASE_STRUCTURE.md)** - Database schema and relationships
+- **[EDGE_FUNCTIONS_GUIDE.md](docs/EDGE_FUNCTIONS_GUIDE.md)** - API endpoint documentation
+- **[CUSTOMER_MANAGEMENT.md](docs/CUSTOMER_MANAGEMENT.md)** - Account system details
+- **[SECURITY_GUIDE.md](docs/SECURITY_GUIDE.md)** - Security implementation
+
+## 🛠️ Development
+
+This system is production-ready and actively serves a Voiceflow chatbot. All edge functions are deployed and maintained through the Supabase dashboard.
+
+For local development or testing:
+1. Clone this repository
+2. Set up environment variables
+3. Follow the setup guide in `docs/SUPABASE_SETUP.md`
+
+## 🎤 Voiceflow Integration
+
+The system is optimized for Voiceflow chatbots with:
+- Conversational API responses
+- Error handling with user-friendly messages
+- Support for voice-based product identification
+- Cancellation prevention with live agent handoff
+
+See `/voiceflow` directory for integration examples and reusable code snippets.
+
+## 📞 Support
+
+This system includes built-in support for:
+- Live agent handoff for complex scenarios
+- Comprehensive error logging
+- Rate limiting protection
+- Data integrity validation
 
 ---
 
-## 🗄️ Database Architecture Reference
-
-For a complete understanding of the Supabase database structure, including all 21 tables, relationships, and AI optimization strategies, see **[DATABASE_STRUCTURE.md](DATABASE_STRUCTURE.md)**.
-
-This document covers:
-- **Normalized Tables** (17): Products, customers, orders, and business logic
-- **AI-Optimized Flat Tables** (4): JSONB structures for single-query chatbot operations  
-- **Automatic Synchronization**: Triggers that keep flat tables updated
-- **Security Policies**: Row-level security implementation
-- **Sample Data**: Pre-loaded products and test scenarios
-
-*Start with [DATABASE_STRUCTURE.md](DATABASE_STRUCTURE.md) for complete technical documentation*
+**Status**: Production Ready ✅  
+**Last Updated**: January 2025  
+**Edge Functions**: 6 active, all current versions deployed
