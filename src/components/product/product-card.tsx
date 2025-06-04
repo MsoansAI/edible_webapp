@@ -21,10 +21,10 @@ export function ProductCard({ product }: ProductCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="group relative overflow-hidden rounded-lg border bg-white shadow-sm transition-all hover:shadow-md"
+      className="product-card"
     >
       <Link href={`/products/${product.product_identifier}`}>
-        <div className="aspect-square overflow-hidden">
+        <div className="product-image">
           <Image
             src={product.image_url}
             alt={product.name}
@@ -33,15 +33,15 @@ export function ProductCard({ product }: ProductCardProps) {
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         </div>
-        <div className="p-4">
-          <h3 className="text-lg font-semibold text-gray-900">{product.name}</h3>
-          <p className="mt-1 text-sm text-gray-500 line-clamp-2">{product.description}</p>
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-lg font-bold text-edible-red">
-              {formatPrice(product.base_price)}
-            </span>
-            <Button size="sm">Add to Cart</Button>
-          </div>
+        <h3 className="product-title">{product.name}</h3>
+        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{product.description}</p>
+        <div className="mt-4 flex items-center justify-between">
+          <span className="product-price">
+            {formatPrice(product.base_price)}
+          </span>
+          <Button size="sm" className="btn-primary">
+            Add to Cart
+          </Button>
         </div>
       </Link>
     </motion.div>
