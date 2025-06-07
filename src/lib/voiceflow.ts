@@ -1,5 +1,4 @@
 import axios, { AxiosError } from 'axios';
-import { chatbotActions, CartActionResponse } from './chatbotActions'
 import { useCartStore } from '@/store/cartStore'
 
 // Define the structure of a Voiceflow trace (add more specific types as needed)
@@ -528,126 +527,8 @@ export const fetchTranscriptDialog = async (
   }
 };
 
-// Add cart and checkout actions to handle chatbot commands
-export const handleChatbotAction = async (action: string, params: any = {}): Promise<CartActionResponse> => {
-  console.log('Executing chatbot action:', action, params)
-  
-  switch (action) {
-    // Cart actions
-    case 'get_cart':
-      return await chatbotActions.getCartSummary()
-    
-    case 'add_to_cart':
-      const { productId, optionId, quantity } = params
-      if (!productId) {
-        return { success: false, message: 'Product ID is required' }
-      }
-      return await chatbotActions.addProductToCart(productId, optionId, quantity)
-    
-    case 'remove_from_cart':
-      if (!params.productId) {
-        return { success: false, message: 'Product ID is required' }
-      }
-      return await chatbotActions.removeFromCart(params.productId, params.optionId)
-    
-    case 'update_cart_quantity':
-      if (!params.productId || params.quantity === undefined) {
-        return { success: false, message: 'Product ID and quantity are required' }
-      }
-      return await chatbotActions.updateCartQuantity(params.productId, params.quantity, params.optionId)
-    
-    case 'clear_cart':
-      return await chatbotActions.clearCart()
-    
-    case 'validate_cart':
-      return await chatbotActions.validateCart()
-    
-    // Checkout actions
-    case 'checkout_status':
-      return await chatbotActions.getCheckoutStatus()
-    
-    case 'proceed_to_checkout':
-      return await chatbotActions.initiateCheckout()
-    
-    // Product actions
-    case 'get_product_details':
-      if (!params.productId) {
-        return { success: false, message: 'Product ID is required' }
-      }
-      return await chatbotActions.getProductDetails(params.productId)
-    
-    // Navigation actions
-    case 'navigate_to_cart':
-      if (typeof window !== 'undefined') {
-        window.location.href = '/cart'
-      }
-      return { success: true, message: 'Navigating to cart...' }
-    
-    case 'navigate_to_checkout':
-      if (typeof window !== 'undefined') {
-        window.location.href = '/checkout'
-      }
-      return { success: true, message: 'Navigating to checkout...' }
-    
-    case 'navigate_to_products':
-      if (typeof window !== 'undefined') {
-        window.location.href = '/products'
-      }
-      return { success: true, message: 'Navigating to products...' }
-    
-    default:
-      return { 
-        success: false, 
-        message: `Unknown action: ${action}. Available actions: get_cart, add_to_cart, remove_from_cart, update_cart_quantity, clear_cart, validate_cart, checkout_status, proceed_to_checkout, get_product_details, navigate_to_cart, navigate_to_checkout, navigate_to_products` 
-      }
-  }
-}
-
-// Enhanced interact function that can handle action requests
-export const interactWithActions = async (userID: string, request: any): Promise<any> => {
-  // First, send the request to Voiceflow
-  const response = await interact(userID, request)
-  
-  // Check if any traces contain action instructions
-  if (response && Array.isArray(response)) {
-    for (const trace of response) {
-      // Check for custom action traces
-      if (trace.type === 'custom' && trace.payload?.action) {
-        const actionResult = await handleChatbotAction(trace.payload.action, trace.payload.params || {})
-        
-        // You could modify the response here to include action results
-        if (actionResult.success) {
-          // Add a success message to the conversation
-          response.push({
-            type: 'text',
-            payload: { message: actionResult.message }
-          })
-        } else {
-          // Add an error message
-          response.push({
-            type: 'text',
-            payload: { message: `Action failed: ${actionResult.message}` }
-          })
-        }
-      }
-      
-      // Check for action buttons that trigger cart/checkout functions
-      if (trace.type === 'choice' && trace.payload?.buttons) {
-        trace.payload.buttons = trace.payload.buttons.map((button: any) => {
-          // If button has action data, we'll handle it when clicked
-          if (button.request?.payload?.action) {
-            button._hasAction = true
-            button._actionType = button.request.payload.action
-            button._actionParams = button.request.payload.params || {}
-          }
-          return button
-        })
-      }
-    }
-  }
-  
-  return response
-}
+// Note: Cart and checkout actions are now handled via custom actions in processVoiceflowTraces
+// See src/lib/voiceflowActions.ts for the new implementation
 
 // Example of how to use it (primarily for testing or direct use later)
 /*

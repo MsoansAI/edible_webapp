@@ -367,6 +367,96 @@ if (semanticSearchFailed) {
 }
 ```
 
+## Frontend Integration - Custom Actions
+
+### Custom Actions Architecture
+The frontend now uses a custom actions system instead of API endpoints. Voiceflow sends custom action traces that are processed by `src/lib/voiceflowActions.ts`.
+
+#### Supported Custom Actions
+
+**Cart Management:**
+```json
+{
+  "type": "custom",
+  "payload": {
+    "action": {
+      "type": "add-to-cart",
+      "payload": {
+        "cartData": {
+          "items": [...],
+          "summary": {...}
+        }
+      }
+    }
+  }
+}
+```
+
+**Item Removal:**
+```json
+{
+  "type": "custom",
+  "payload": {
+    "action": {
+      "type": "remove-item",
+      "payload": {
+        "productIdentifier": "3075",
+        "optionName": "Large"
+      }
+    }
+  }
+}
+```
+
+**Navigation:**
+```json
+{
+  "type": "custom",
+  "payload": {
+    "action": {
+      "type": "checkout-page",
+      "payload": {}
+    }
+  }
+}
+```
+
+#### Full Cart Context
+Every Voiceflow interaction now includes complete cart state:
+
+```javascript
+// Automatically passed to Voiceflow with each message
+const context = {
+  cartData: {
+    items: [...], // Full cart items with UUIDs
+    summary: {
+      itemCount: 3,
+      subtotal: 89.97,
+      tax: 7.42,
+      shipping: 0,
+      total: 97.39,
+      freeShippingEligible: true
+    }
+  },
+  cartItemCount: 3,
+  cartTotal: 97.39,
+  isAuthenticated: true,
+  userId: "user-uuid"
+}
+```
+
+### Migration from Legacy APIs
+
+**Before (Removed):**
+- `POST /api/cart` - Cart operations
+- `GET /api/checkout` - Checkout status
+- `src/lib/chatbotActions.ts` - Legacy action handler
+
+**After (Current):**
+- Custom Actions: Direct Voiceflow → Frontend communication
+- Backend Validation: Voiceflow → cart-manager → Frontend sync
+- State Management: Full cart context in every interaction
+
 ## Performance Optimization
 
 ### Response Caching
@@ -388,5 +478,11 @@ const [customerResponse, storeResponse] = await Promise.all([
   fetch(storeEndpoint, storeRequest)
 ]);
 ```
+
+### Custom Actions Benefits
+1. **Eliminated API Duplication**: Direct Voiceflow-backend integration
+2. **Real-time Sync**: Cart state always synchronized
+3. **Better Performance**: Reduced API call chains
+4. **Simplified Architecture**: Single responsibility patterns
 
 This integration guide provides everything needed to build sophisticated Voiceflow chatbots that leverage the complete Edible Arrangements backend while maintaining natural, conversational interactions. 

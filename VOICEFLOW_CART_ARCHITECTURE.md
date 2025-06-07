@@ -11,7 +11,16 @@ Frontend Cart ←→ Voiceflow Variables ←→ Supabase Edge Functions
      ↓                    ↓                        ↓
 Cart Store         Full cartData            cart-manager
   (Zustand)         Variable              (Validation/Products)
+     ↓                    ↓                        
+Custom Actions    Custom Actions         
+  Handler          (Voiceflow)           
 ```
+
+**Key Components:**
+- **Frontend Cart Store**: Zustand-based cart management
+- **Custom Actions Handler**: `src/lib/voiceflowActions.ts` processes Voiceflow custom actions
+- **Voiceflow Variables**: Full cart state passed with every interaction
+- **Supabase Edge Functions**: Backend validation and processing (`cart-manager`)
 
 ## 📊 **Data Flow**
 
@@ -304,11 +313,34 @@ return {
 # 4. Should navigate to checkout page
 ```
 
+## 🗑️ **Removed Legacy Components**
+
+The following files have been removed as part of the custom actions migration:
+
+### **Frontend API Endpoints (Removed)**
+- ~~`src/app/api/cart/route.ts`~~ - Cart operations now handled via custom actions
+- ~~`src/app/api/checkout/route.ts`~~ - Checkout flow now handled via custom actions
+
+### **Legacy Libraries (Removed)**
+- ~~`src/lib/chatbotActions.ts`~~ - Replaced by `src/lib/voiceflowActions.ts`
+
+### **Why These Were Removed:**
+1. **Eliminated Duplication**: Frontend APIs duplicated cart-manager functionality
+2. **Simplified Architecture**: Direct Voiceflow ↔ Supabase integration
+3. **Better Performance**: Reduced API call chains
+4. **Cleaner Codebase**: Single responsibility pattern
+
+### **Migration Path:**
+- **Cart Operations**: Use `cart-manager` edge function directly from Voiceflow
+- **Frontend Updates**: Use custom actions (add-to-cart, remove-item, checkout-page)
+- **Navigation**: Use custom actions (navigate) instead of API redirects
+
 ## 🚀 **Deployment Notes**
 
 1. **Environment Variables**: Update Voiceflow project with production URLs
 2. **Backend Endpoints**: Ensure cart-manager is deployed
 3. **Variable Sync**: Test full cart data flow in production
 4. **Error Handling**: Verify fallbacks for failed sync operations
+5. **Legacy Cleanup**: Ensure no references to removed API endpoints
 
 This architecture provides a robust, scalable solution for cart management between your website and Voiceflow chatbot! 🎉 
