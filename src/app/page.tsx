@@ -7,10 +7,13 @@ import { ArrowRightIcon, HeartIcon, GiftIcon, TruckIcon, SparklesIcon, ShieldChe
 import { Product } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
+import { useCartStore } from '@/store/cartStore'
+import toast from 'react-hot-toast'
 
 export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { addItem } = useCartStore()
 
   useEffect(() => {
     const fetchFeaturedProducts = async () => {
@@ -63,6 +66,11 @@ export default function HomePage() {
     { number: '99%', label: 'On-Time Delivery' },
     { number: '4.9', label: 'Average Rating', icon: StarIcon }
   ]
+
+  const handleAddToCart = (product: Product) => {
+    addItem(product)
+    toast.success(`${product.name} added to cart!`)
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -209,7 +217,11 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  onAddToCart={handleAddToCart}
+                />
               ))}
             </div>
           )}

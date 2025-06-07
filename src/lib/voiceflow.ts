@@ -77,7 +77,7 @@ export const generateUserId = (): string => {
   return `user_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
 };
 
-// Enhanced context interface for sending data to Voiceflow
+// Enhanced context interface for sending complete cart data to Voiceflow
 interface ChatContext {
   isAuthenticated?: boolean
   userId?: string
@@ -88,6 +88,19 @@ interface ChatContext {
   userRole?: string
   lastOrderDate?: string
   preferredDeliveryZip?: string
+  // Full cart data object
+  cartData?: {
+    items: any[]
+    summary: {
+      itemCount: number
+      subtotal: number
+      tax: number
+      shipping: number
+      total: number
+      freeShippingEligible: boolean
+    }
+    itemDetails: any[]
+  }
 }
 
 // Enhanced interact function with context support
@@ -119,9 +132,23 @@ export const interact = async (
           userEmail: context.userEmail || null,
           userRole: context.userRole || 'guest',
           
-          // Shopping context
+          // Shopping context (individual variables for backward compatibility)
           cartItemCount: context.cartItemCount || 0,
           cartTotal: context.cartTotal || 0,
+          
+          // Full cart data object
+          cartData: context.cartData || {
+            items: [],
+            summary: {
+              itemCount: 0,
+              subtotal: 0,
+              tax: 0,
+              shipping: 0,
+              total: 0,
+              freeShippingEligible: false
+            },
+            itemDetails: []
+          },
           
           // User preferences
           lastOrderDate: context.lastOrderDate || null,
@@ -158,8 +185,8 @@ export const interact = async (
     }
 
     const traces = await response.json()
-    console.log('Voiceflow response traces:', traces)
-    return traces || []
+    console.log('Voiceflow response:', traces)
+    return traces
   } catch (error) {
     console.error('Error interacting with Voiceflow:', error)
     return []
@@ -203,7 +230,7 @@ export const updateAuthenticationStatus = async (
   }
 }
 
-// New function to send cart updates
+// Enhanced function to send cart updates with complete cart data
 export const updateCartContext = async (
   userID: string,
   cartData: any
@@ -211,13 +238,41 @@ export const updateCartContext = async (
   try {
     const itemCount = cartData?.items?.length || 0
     const total = cartData?.getTotal?.() || 0
+    
+    // Build complete cart object for Voiceflow
+    const fullCartData = {
+      items: cartData.items || [],
+      summary: {
+        itemCount: itemCount,
+        subtotal: total,
+        tax: total * 0.0825,
+        shipping: total >= 65 ? 0 : 9.99,
+        total: total + (total * 0.0825) + (total >= 65 ? 0 : 9.99),
+        freeShippingEligible: total >= 65
+      },
+      itemDetails: (cartData.items || []).map((item: any) => ({
+        productId: item.product.id,
+        productIdentifier: item.product.product_identifier,
+        productName: item.product.name,
+        option: item.option ? {
+          id: item.option.id,
+          name: item.option.option_name,
+          price: item.option.price
+        } : null,
+        quantity: item.quantity,
+        unitPrice: item.option ? item.option.price : item.product.base_price,
+        totalPrice: (item.option ? item.option.price : item.product.base_price) * item.quantity,
+        imageUrl: item.product.image_url
+      }))
+    }
 
     const context: ChatContext = {
       cartItemCount: itemCount,
-      cartTotal: total
+      cartTotal: total,
+      cartData: fullCartData
     }
 
-    // Send cart update to Voiceflow
+    // Send cart update to Voiceflow using a special intent
     await interact(userID, {
       type: 'intent',
       payload: {
@@ -234,16 +289,16 @@ export const updateCartContext = async (
   }
 }
 
-// Enhanced sendMessage function with automatic context
+// Enhanced sendMessage function with automatic full cart context
 export const sendMessageWithContext = async (
   userID: string,
   message: string,
   additionalContext?: ChatContext
 ): Promise<any[]> => {
-  // Get current authentication state (you'll need to adapt this to your auth system)
+  // Get current authentication state
   const authContext = getCurrentAuthContext()
   
-  // Get current cart state
+  // Get current cart state with full data
   const cartContext = getCurrentCartContext()
   
   // Merge all context
@@ -286,18 +341,59 @@ function getCurrentAuthContext(): ChatContext {
 function getCurrentCartContext(): ChatContext {
   try {
     // Get from your cart store
-    const cartData = useCartStore.getState() || {}
-    const itemCount = cartData?.items?.length || 0
-    const total = cartData?.getTotal?.() || 0
+    const cartStore = useCartStore.getState() || {}
+    const items = cartStore?.items || []
+    const itemCount = items.length
+    const total = cartStore?.getTotal?.() || 0
+    
+    // Build complete cart data
+    const fullCartData = {
+      items: items,
+      summary: {
+        itemCount: itemCount,
+        subtotal: total,
+        tax: total * 0.0825,
+        shipping: total >= 65 ? 0 : 9.99,
+        total: total + (total * 0.0825) + (total >= 65 ? 0 : 9.99),
+        freeShippingEligible: total >= 65
+      },
+      itemDetails: items.map((item: any) => ({
+        productId: item.product.id,
+        productIdentifier: item.product.product_identifier,
+        productName: item.product.name,
+        option: item.option ? {
+          id: item.option.id,
+          name: item.option.option_name,
+          price: item.option.price
+        } : null,
+        quantity: item.quantity,
+        unitPrice: item.option ? item.option.price : item.product.base_price,
+        totalPrice: (item.option ? item.option.price : item.product.base_price) * item.quantity,
+        imageUrl: item.product.image_url
+      }))
+    }
     
     return {
       cartItemCount: itemCount,
-      cartTotal: total
+      cartTotal: total,
+      cartData: fullCartData
     }
   } catch (error) {
     return {
       cartItemCount: 0,
-      cartTotal: 0
+      cartTotal: 0,
+      cartData: {
+        items: [],
+        summary: {
+          itemCount: 0,
+          subtotal: 0,
+          tax: 0,
+          shipping: 0,
+          total: 0,
+          freeShippingEligible: false
+        },
+        itemDetails: []
+      }
     }
   }
 }

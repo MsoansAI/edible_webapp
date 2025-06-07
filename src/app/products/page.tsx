@@ -7,6 +7,8 @@ import { Product, Category } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
 import ProductFilters from '@/components/ProductFilters'
+import { useCartStore } from '@/store/cartStore'
+import toast from 'react-hot-toast'
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -16,6 +18,7 @@ export default function ProductsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const searchParams = useSearchParams()
+  const { addItem } = useCartStore()
   
   const PRODUCTS_PER_PAGE = 12
 
@@ -111,6 +114,11 @@ export default function ProductsPage() {
   const searchQuery = searchParams.get('search')
   const categoryFilter = searchParams.get('category')
 
+  const handleAddToCart = (product: Product) => {
+    addItem(product)
+    toast.success(`${product.name} added to cart!`)
+  }
+
   return (
     <div className="min-h-screen bg-white">
       
@@ -193,7 +201,11 @@ export default function ProductsPage() {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {products.map((product) => (
-                    <ProductCard key={product.id} product={product} />
+                    <ProductCard 
+                      key={product.id} 
+                      product={product} 
+                      onAddToCart={handleAddToCart}
+                    />
                   ))}
                 </div>
 

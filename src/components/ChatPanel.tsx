@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast';
 import { useVoiceflowAuth } from '@/hooks/useVoiceflowAuth'
 import { sendMessageWithContext } from '@/lib/voiceflow'
+import { processVoiceflowTraces } from '@/lib/voiceflowActions'
 
 // --- Begin Carousel & Button Types ---
 export interface VoiceflowButton {
@@ -549,7 +550,7 @@ export default function ChatPanel() {
     }
   };
 
-  const processTraces = (traces: VoiceflowTrace[]) => {
+  const processTraces = async (traces: VoiceflowTrace[]) => {
     setMessages(prevMessages => {
       const newMessages = prevMessages.filter(m => !(m.sender === 'system' && m.type === 'loading'));
       if (newMessages.length === 0 && prevMessages.some(m => m.id === 'launch-loading') && !traces.some(t => t.type !== 'loading' && t.type !== 'end')) {
@@ -568,9 +569,12 @@ export default function ChatPanel() {
         return;
     }
 
-    // Extract text messages for staggered display
-    const textTraces = traces.filter(trace => (trace.type === 'text' || trace.type === 'speak') && trace.payload?.message);
-    const otherTraces = traces.filter(trace => trace.type !== 'text' && trace.type !== 'speak');
+    // Process custom actions first
+    const processedTraces = await processVoiceflowTraces(traces);
+
+    // Extract text messages for staggered display (excluding processed custom actions)
+    const textTraces = processedTraces.filter(trace => !trace.processed && (trace.type === 'text' || trace.type === 'speak') && trace.payload?.message);
+    const otherTraces = processedTraces.filter(trace => !trace.processed && trace.type !== 'text' && trace.type !== 'speak');
 
     // Process text messages with staggered animation
     if (textTraces.length > 0) {
@@ -688,7 +692,7 @@ export default function ChatPanel() {
       })
       
       // Process traces as before...
-      processTraces(traces)
+      await processTraces(traces)
       
     } catch (error) {
       console.error('Error sending message:', error)
@@ -727,7 +731,7 @@ export default function ChatPanel() {
     
     try {
       const traces = await interact(userId, createTextRequest(userMessageContent));
-      processTraces(traces);
+      await processTraces(traces);
       
       // Save transcript after user message
       saveTranscript(userId).catch(error => {
@@ -763,7 +767,7 @@ export default function ChatPanel() {
     
     try {
       const traces = await interact(userId, requestAction);
-      processTraces(traces);
+      await processTraces(traces);
     } catch (error) {
       handleInteractionError(error);
     }
