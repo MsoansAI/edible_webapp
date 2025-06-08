@@ -1,3 +1,64 @@
+# Technical Architecture
+
+This document provides a detailed breakdown of the technical architecture for the Edible Arrangements AI agent project.
+
+## 1. Frontend Architecture
+
+-   **Framework:** [Next.js](https://nextjs.org/) (React)
+-   **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+-   **UI Components:** Built using a combination of custom components and primitives from [shadcn/ui](https://ui.shadcn.com/).
+-   **State Management:** Primarily managed via React hooks (`useState`, `useContext`) and component state. For global state, especially for the chatbot and user session, React's Context API is utilized.
+-   **Key Directories:**
+    -   `src/app/`: Main application routes and page components.
+    -   `src/components/`: Reusable UI components (e.g., `Header`, `ChatPanel`).
+    -   `src/lib/`: Utility functions, type definitions (`types.ts`), and client-side API interaction logic.
+    -   `src/styles/`: Global CSS styles.
+
+## 2. Backend Architecture (Supabase)
+
+The backend is fully hosted on Supabase and leverages its integrated services.
+
+### 2.1. Edge Functions
+
+These are Deno-based TypeScript functions that contain the core business logic. They are located in the `supabase/functions/` directory.
+
+-   **`product-search`**: Handles semantic search queries for products using vector embeddings.
+-   **`customer-management`**: Manages customer data. It can find existing customers (by phone, email, or auth ID) or create new ones, intelligently merging data from different sources.
+-   **`franchisee-inventory`**: Finds the nearest franchisee based on a ZIP code and checks for product availability.
+-   **`order`**: Orchestrates the creation and retrieval of entire orders. It handles generating order numbers, calculating totals, and managing fulfillment details. Supports `GET`, `POST`, and `PATCH`.
+-   **`order-items`**: A powerful function for modifying the contents of an existing order. It supports adding, updating, and removing items, with advanced logic for handling product options and preventing accidental order cancellations. Supports `PATCH`.
+-   **`cart-manager`**: Provides a stateful cart API for the frontend, allowing for the creation of carts and the addition/removal of items before an order is formally created.
+-   **`user-profile`**: Handles profile data for authenticated web app users, allowing them to view and update their personal information.
+-   **`generate-embedding`**: A utility function used to convert product descriptions and other text into vector embeddings for semantic search.
+
+### 2.2. Database (PostgreSQL)
+
+The database schema is designed to be both normalized for data integrity and denormalized for performance, especially for the AI agent's needs.
+
+-   **Core Tables:**
+    -   `products`: Contains all product information.
+    -   `product_options`: Different variations of a product (e.g., Small, Large).
+    -   `customers`: Stores all customer information, linked to `auth.users` for authenticated sessions.
+    -   `franchisees`: Information about each store location.
+    -   `inventory`: Tracks product stock at each franchisee.
+    -   `orders`: The main orders table, containing high-level information.
+    -   `order_items`: Line items for each order, linked to products and options.
+    -   `carts` & `cart_items`: Manages pre-order shopping carts.
+
+-   **"Flat" Tables for AI:**
+    -   To provide the AI agent with fast, comprehensive data, several "flat" tables are maintained using database triggers. These tables contain denormalized JSON blobs of related data.
+    -   `chatbot_orders_flat`: Contains a complete snapshot of an order, including all items, customer info, and delivery details in a single row. This avoids complex joins when the chatbot needs to retrieve order status.
+    -   `chatbot_customers_flat`: Similar to the above, but for customer data.
+    -   `chatbot_franchisees_flat`: Contains denormalized franchisee data.
+
+## 3. Integrations
+
+-   **Voiceflow:** The primary tool for designing the conversational flow of the AI agent. The frontend communicates with Voiceflow, which in turn calls the Supabase Edge Functions to perform actions and retrieve data. The API contracts for these interactions are documented in:
+    -   `docs/voiceflow-order-modification-api.md`
+    -   `docs/voiceflow-button-handling-guide.md`
+-   **OpenAI:** Used by Voiceflow and the `generate-embedding` function for its powerful language models.
+-   **VAPI:** Manages the telephony layer, connecting phone calls to the Voiceflow agent.
+
 # Edible Arrangements Voiceflow Integration Architecture
 
 ## System Overview

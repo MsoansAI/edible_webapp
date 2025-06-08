@@ -1,16 +1,46 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ShoppingCartIcon, UserIcon, MagnifyingGlassIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useCartStore } from '@/store/cartStore'
+import { supabase } from '@/lib/supabase'
 import SearchBar from './SearchBar'
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const { getItemCount } = useCartStore()
   const itemCount = getItemCount()
+  const router = useRouter()
+
+  useEffect(() => {
+    // Check initial auth state
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsAuthenticated(!!session)
+    }
+
+    checkAuth()
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleAccountClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (isAuthenticated) {
+      router.push('/profile')
+    } else {
+      router.push('/auth')
+    }
+  }
 
   const navigation = [
     { name: 'Shop All', href: '/products' },
@@ -70,13 +100,14 @@ export default function Header() {
             </button>
 
             {/* Account */}
-            <Link
-              href="/auth"
+            <button
+              onClick={handleAccountClick}
               className="p-1.5 sm:p-2 text-gray-700 hover:text-primary-600 transition-colors duration-200 [.chat-is-open-and-squeezing_&]:md:p-1.5 [.chat-is-open-and-squeezing_&]:lg:p-2"
-              aria-label="Account"
+              aria-label={isAuthenticated ? "View Profile" : "Sign In"}
+              title={isAuthenticated ? "View Profile" : "Sign In"}
             >
               <UserIcon className="h-5 w-5 sm:h-6 sm:w-6 [.chat-is-open-and-squeezing_&]:md:h-5 [.chat-is-open-and-squeezing_&]:md:w-5 [.chat-is-open-and-squeezing_&]:lg:h-6 [.chat-is-open-and-squeezing_&]:lg:w-6" />
-            </Link>
+            </button>
 
             {/* Cart */}
             <Link

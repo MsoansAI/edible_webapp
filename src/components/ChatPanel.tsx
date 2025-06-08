@@ -16,14 +16,10 @@ import {
   VoiceflowTrace,
   VoiceflowRequestAction,
   saveTranscript,
-  fetchTranscripts,
-  fetchTranscriptDialog,
-  VoiceflowTranscript,
-  VoiceflowDialog,
+  sendMessageWithFullContext
 } from '@/lib/voiceflow';
 import toast from 'react-hot-toast';
 import { useVoiceflowAuth } from '@/hooks/useVoiceflowAuth'
-import { sendMessageWithContext } from '@/lib/voiceflow'
 import { processVoiceflowTraces } from '@/lib/voiceflowActions'
 
 // --- Begin Carousel & Button Types ---
@@ -62,13 +58,6 @@ export interface ChatMessageUI {
     [key: string]: any;
   };
   timestamp: Date;
-  isHistorical?: boolean; // To mark messages from previous conversations
-}
-
-export interface HistoricalConversation {
-  transcript: VoiceflowTranscript;
-  messages: ChatMessageUI[];
-  expanded: boolean;
 }
 
 // Enhanced Product Grid Display Component (2x2 layout)
@@ -369,7 +358,6 @@ const OptionsModalDisplay: React.FC<{
   );
 };
 
-
 export default function ChatPanel() {
   const { isChatOpen, closeChat, toggleChat } = useUIStore();
   const [userId, setUserId] = useState<string | null>(null);
@@ -379,15 +367,11 @@ export default function ChatPanel() {
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const [optionsCarouselData, setOptionsCarouselData] = useState<CarouselData | null>(null);
   const [latestMessageId, setLatestMessageId] = useState<string | null>(null);
-  const [pendingTextMessages, setPendingTextMessages] = useState<string[]>([]);
   const [currentTurnMessages, setCurrentTurnMessages] = useState<string[]>([]);
-  const [isViewingHistory, setIsViewingHistory] = useState(false);
-  const [historicalConversations, setHistoricalConversations] = useState<HistoricalConversation[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isScrollingUp, setIsScrollingUp] = useState(false);
   const chatPanelBodyRef = useRef<HTMLDivElement>(null);
   const hasLaunchedRef = useRef(false);
+  const [cartVersion, setCartVersion] = useState(0);
 
   // Example auth state - replace with your actual auth system
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -400,72 +384,15 @@ export default function ChatPanel() {
     userID: userId || 'anonymous' // Handle null userId
   })
 
-  useEffect(() => {
-    if (isChatOpen && chatPanelBodyRef.current) {
-      chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
-    }
-  }, [messages, isChatOpen]);
-
-  // History loading function
-  const loadConversationHistory = async () => {
-    if (!userId || isLoadingHistory || hasLoadedHistory) return;
-    
-    setIsLoadingHistory(true);
-    try {
-      const transcripts = await fetchTranscripts();
-      const recentTranscripts = transcripts
-        .filter(t => t.sessionID !== userId) // Exclude current session
-        .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
-        .slice(0, 5); // Load last 5 conversations
-
-      const conversations: HistoricalConversation[] = [];
-      
-      for (const transcript of recentTranscripts) {
-        try {
-          const dialog = await fetchTranscriptDialog(transcript._id);
-          const messages: ChatMessageUI[] = dialog.map((entry, index) => ({
-            id: `hist-${transcript._id}-${index}`,
-            sender: entry.type === 'request' ? 'user' : 'agent',
-            type: 'text',
-            content: entry.payload?.message || entry.payload || 'No content',
-            timestamp: new Date(entry.timestamp),
-            isHistorical: true,
-          }));
-
-          conversations.push({
-            transcript,
-            messages,
-            expanded: false,
-          });
-        } catch (error) {
-          console.error('Error loading dialog for transcript:', transcript._id, error);
-        }
-      }
-
-      setHistoricalConversations(conversations);
-      setHasLoadedHistory(true);
-    } catch (error) {
-      console.error('Error loading conversation history:', error);
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  };
-
-  // Scroll listener to detect if user is viewing history and load more
+  // Scroll detection to show/hide previous turns
   useEffect(() => {
     const handleScroll = () => {
       if (!chatPanelBodyRef.current) return;
       
       const { scrollTop, scrollHeight, clientHeight } = chatPanelBodyRef.current;
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
-      const isNearTop = scrollTop < 100; // Within 100px of top
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 50; // 50px threshold
       
-      setIsViewingHistory(!isAtBottom);
-
-      // Load history when user scrolls near the top
-      if (isNearTop && !isLoadingHistory && !hasLoadedHistory && userId) {
-        loadConversationHistory();
-      }
+      setIsScrollingUp(!isAtBottom);
     };
 
     const scrollContainer = chatPanelBodyRef.current;
@@ -473,7 +400,13 @@ export default function ChatPanel() {
       scrollContainer.addEventListener('scroll', handleScroll);
       return () => scrollContainer.removeEventListener('scroll', handleScroll);
     }
-  }, [isChatOpen, userId, isLoadingHistory, hasLoadedHistory]);
+  }, [isChatOpen]);
+
+  useEffect(() => {
+    if (isChatOpen && chatPanelBodyRef.current) {
+      chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
+    }
+  }, [messages, isChatOpen]);
 
   useEffect(() => {
     if (isChatOpen && !userId) {
@@ -506,7 +439,7 @@ export default function ChatPanel() {
       newMessage,
     ]);
     
-    // Track current turn messages
+    // Track current turn messages for visual effects
     setCurrentTurnMessages(prev => [...prev, newMessage.id]);
     
     // Track latest message for styling
@@ -517,11 +450,19 @@ export default function ChatPanel() {
 
   // Start a new conversation turn (when user sends a message)
   const startNewTurn = () => {
-    // Force scroll to bottom and clear current turn
+    // Clear current turn to fade previous messages
     setCurrentTurnMessages([]);
-    setIsViewingHistory(false);
     
-    // Ensure we're at the bottom
+    // Auto-scroll to bottom
+    setTimeout(() => {
+      if (chatPanelBodyRef.current) {
+        chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
+      }
+    }, 50);
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
     setTimeout(() => {
       if (chatPanelBodyRef.current) {
         chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
@@ -551,108 +492,64 @@ export default function ChatPanel() {
   };
 
   const processTraces = async (traces: VoiceflowTrace[]) => {
-    setMessages(prevMessages => {
-      const newMessages = prevMessages.filter(m => !(m.sender === 'system' && m.type === 'loading'));
-      if (newMessages.length === 0 && prevMessages.some(m => m.id === 'launch-loading') && !traces.some(t => t.type !== 'loading' && t.type !== 'end')) {
-        return prevMessages;
-      }
-      if (newMessages.length > 0) return newMessages;
-      if (prevMessages.some(m => m.id === 'launch-loading') && traces.every(t => t.type === 'loading' || t.type === 'end')) {
-          return prevMessages.filter(m => m.id === 'launch-loading');
-      }
-      return newMessages;
-    });
-
-    let conversationContinues = true;
-    if (traces.length === 0) {
-        setIsLoading(false);
-        return;
-    }
-
-    // Process custom actions first
+    // 1. Clear any "loading..." messages
+    setMessages(prevMessages => prevMessages.filter(m => m.type !== 'loading'));
+    
+    // 2. Let the dedicated action handler process all traces first
+    // This function will handle custom actions like 'clear-cart', 'navigate', etc.
     const processedTraces = await processVoiceflowTraces(traces);
 
-    // Extract text messages for staggered display (excluding processed custom actions)
-    const textTraces = processedTraces.filter(trace => !trace.processed && (trace.type === 'text' || trace.type === 'speak') && trace.payload?.message);
-    const otherTraces = processedTraces.filter(trace => !trace.processed && trace.type !== 'text' && trace.type !== 'speak');
+    // 3. Loop through and display the remaining, unprocessed visual traces
+    for (const trace of processedTraces) {
+      // Skip traces that the action handler already took care of
+      if (trace.processed) {
+        continue;
+      }
 
-    // Process text messages with staggered animation
-    if (textTraces.length > 0) {
-      textTraces.forEach((trace, index) => {
-        setTimeout(() => {
-          addMessageToList({ sender: 'agent', type: 'text', content: trace.payload.message });
-          
-          // Auto-scroll after each message (stronger scroll to bottom)
-          setTimeout(() => {
-            if (chatPanelBodyRef.current && !isViewingHistory) {
-              chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
-            }
-          }, 100);
-        }, index * 800); // 800ms delay between messages
-      });
-    }
-
-    // Process other traces after text messages
-    const totalTextDelay = textTraces.length * 800;
-    setTimeout(() => {
-      otherTraces.forEach((trace) => {
-        if (trace.type === 'error' && trace.payload?.message.includes('Voiceflow client not configured')){
-          addMessageToList({ sender: 'system', type: 'error', content: 'Chatbot is not configured. Please set Voiceflow API Key.'});
-          conversationContinues = false;
-        }
-        switch (trace.type) {
+      switch (trace.type) {
+        case 'text':
+        case 'speak':
+          if (trace.payload?.message) {
+            addMessageToList({ sender: 'agent', type: 'text', content: trace.payload.message });
+          }
+          break;
+        
         case 'carousel':
           const carouselData = trace.payload as CarouselData;
-          if (carouselData && carouselData.cards && carouselData.cards.length > 0) {
-            // Check if this is an options carousel
-            if (carouselData.metadata?.carouselType === 'options') {
-              // Show options in modal instead of inline
-              setOptionsCarouselData(carouselData);
-              setShowOptionsModal(true);
-            } else {
-              // Show regular carousel inline
-              addMessageToList({ sender: 'agent', type: 'carousel', payload: { carouselData } });
-            }
+          if (carouselData?.cards?.length > 0) {
+            addMessageToList({ sender: 'agent', type: 'carousel', payload: { carouselData } });
           }
           break;
+
         case 'choice':
-          if (trace.payload?.buttons && Array.isArray(trace.payload.buttons) && trace.payload.buttons.length > 0) {
-            addMessageToList({ sender: 'agent', type: 'buttons', payload: { buttons: trace.payload.buttons }});
+          if (trace.payload?.buttons?.length > 0) {
+            addMessageToList({ sender: 'agent', type: 'buttons', payload: { buttons: trace.payload.buttons } });
           }
           break;
-        case 'error':
-           addMessageToList({ sender: 'system', type: 'error', content: trace.payload?.message || 'An error occurred communicating with the assistant.', payload: { details: trace.payload?.details } });
-           break;
+
         case 'end':
-          addMessageToList({ sender: 'system', type: 'text', content: 'Conversation ended.' });
-          setInputValue('');
-          conversationContinues = false;
-          break;
-        default:
-          console.log('Unhandled trace type:', trace.type, trace.payload);
-          break;
-        }
-      });
+          // Optionally, you can add a system message for the end of a conversation
+          // addMessageToList({ sender: 'system', type: 'text', content: 'Conversation ended.' });
+          setIsLoading(false);
+          return; // End processing
 
-      // Final auto-scroll and cleanup
-      setTimeout(() => {
-        if (chatPanelBodyRef.current) {
-          chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
-        }
-      }, 100);
-
-      // Save transcript after interaction
-      if (userId && conversationContinues) {
-        saveTranscript(userId).catch(error => {
-          console.error('Error saving transcript:', error);
-        });
+        case 'error':
+          const errorMessage = trace.payload?.message || 'An error occurred communicating with the assistant.';
+          addMessageToList({ sender: 'system', type: 'error', content: errorMessage, payload: { details: trace.payload?.details } });
+          break;
+        
+        // No default case needed, we intentionally ignore other traces like 'visual', etc.
       }
-    }, totalTextDelay + 200);
-
-    setIsLoading(false);
-
-    if (!conversationContinues) {
     }
+
+    // 4. Final UI updates
+    setIsLoading(false);
+    // Auto-scroll to show new messages
+    setTimeout(() => {
+      if (chatPanelBodyRef.current) {
+        chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
+      }
+    }, 100);
   };
 
   const handleInteractionError = (error: any) => {
@@ -686,7 +583,7 @@ export default function ChatPanel() {
 
     try {
       // Send message with authentication and cart context
-      const traces = await sendMessageWithContext(userId || 'anonymous', message, {
+      const traces = await sendMessageWithFullContext(userId || 'anonymous', message, {
         // Optional: add any additional context here
         // Remove sessionSource as it's not part of ChatContext
       })
@@ -713,9 +610,6 @@ export default function ChatPanel() {
     if (e) e.preventDefault();
     if (!inputValue.trim() || !userId || isLoading) return;
     
-    // Start new conversation turn
-    startNewTurn();
-    
     const userMessageContent = inputValue.trim();
     addMessageToList({ sender: 'user', type: 'text', content: userMessageContent });
     setInputValue('');
@@ -723,15 +617,18 @@ export default function ChatPanel() {
     addMessageToList({ sender: 'system', type: 'loading', content: 'Thinking...' });
     
     // Auto-scroll to bottom when starting new turn
-    setTimeout(() => {
-      if (chatPanelBodyRef.current) {
-        chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
-      }
-    }, 100);
+    startNewTurn();
     
     try {
-      const traces = await interact(userId, createTextRequest(userMessageContent));
-      await processTraces(traces);
+      // Use the enhanced function that includes full context (cart + auth)
+      const authDetails = user ? {
+        userId: user.id,
+        email: user.email,
+        authUserId: user.id
+      } : undefined;
+      
+      const traces = await sendMessageWithFullContext(userId, userMessageContent, authDetails);
+      await processTraces(traces as any);
       
       // Save transcript after user message
       saveTranscript(userId).catch(error => {
@@ -745,9 +642,6 @@ export default function ChatPanel() {
   const handleButtonChoiceClick = async (requestAction: VoiceflowRequestAction, buttonName: string) => {
     if (!userId || isLoading) return;
     
-    // Start new conversation turn
-    startNewTurn();
-    
     addMessageToList({ sender: 'user', type: 'text', content: buttonName });
     
     // Don't remove carousels when clicking show_options - keep them visible
@@ -759,15 +653,48 @@ export default function ChatPanel() {
     addMessageToList({ sender: 'system', type: 'loading', content: 'Thinking...' });
     
     // Auto-scroll to bottom when starting new turn
-    setTimeout(() => {
-      if (chatPanelBodyRef.current) {
-        chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
-      }
-    }, 100);
+    startNewTurn();
     
     try {
-      const traces = await interact(userId, requestAction);
-      await processTraces(traces);
+      // For button clicks, use the base interact function but with full context
+      const cartStore = useCartStore.getState();
+      const cartData = {
+        items: cartStore.items || [],
+        summary: {
+          itemCount: cartStore.items?.length || 0,
+          subtotal: cartStore.getTotal() || 0,
+          tax: (cartStore.getTotal() || 0) * 0.0825,
+          shipping: (cartStore.getTotal() || 0) >= 65 ? 0 : 9.99,
+          total: (cartStore.getTotal() || 0) + ((cartStore.getTotal() || 0) * 0.0825) + ((cartStore.getTotal() || 0) >= 65 ? 0 : 9.99),
+          freeShippingEligible: (cartStore.getTotal() || 0) >= 65
+        },
+        itemDetails: (cartStore.items || []).map((item: any) => ({
+          productId: item.product.id,
+          productIdentifier: item.product.product_identifier,
+          productName: item.product.name,
+          option: item.option ? {
+            id: item.option.id,
+            name: item.option.option_name,
+            price: item.option.price
+          } : null,
+          quantity: item.quantity,
+          unitPrice: item.option ? item.option.price : item.product.base_price,
+          totalPrice: (item.option ? item.option.price : item.product.base_price) * item.quantity
+        }))
+      };
+
+      const context = {
+        isAuthenticated: !!user,
+        userId: user?.id,
+        userName: user?.name,
+        userEmail: user?.email,
+        cartItemCount: cartStore.items?.length || 0,
+        cartTotal: cartStore.getTotal() || 0,
+        cartData
+      };
+
+      const traces = await interact(userId, requestAction, context);
+      await processTraces(traces as any);
     } catch (error) {
       handleInteractionError(error);
     }
@@ -778,26 +705,20 @@ export default function ChatPanel() {
     setOptionsCarouselData(null);
   };
 
-  const toggleHistoricalConversation = (transcriptId: string) => {
-    setHistoricalConversations(prev => 
-      prev.map(conv => 
-        conv.transcript._id === transcriptId 
-          ? { ...conv, expanded: !conv.expanded }
-          : conv
-      )
-    );
-  };
+  useEffect(() => {
+    // This effect listens for our custom cart update event
+    const handleCartUpdate = () => {
+      console.log('Cart update event received, forcing re-render.');
+      setCartVersion(prevVersion => prevVersion + 1);
+    };
 
-  const formatConversationDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays <= 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
-  };
+    window.addEventListener('cart-updated', handleCartUpdate);
+
+    // Clean up the event listener when the component unmounts
+    return () => {
+      window.removeEventListener('cart-updated', handleCartUpdate);
+    };
+  }, []); // Empty dependency array means this runs once on mount
 
   return (
     <>
@@ -845,213 +766,122 @@ export default function ChatPanel() {
           isChatOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-      {/* Enhanced Chat Header - Integrated banner when open */}
-      <div className="bg-gradient-to-r from-primary-600 via-primary-700 to-accent-600 text-white shadow-2xl border-b-2 border-primary-500">
-        <div className="px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            {/* Left side - Enhanced info */}
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-white/20 rounded-full">
-                  <SparklesIcon className="h-6 w-6 text-white" />
-                </div>
-                                 <div>
-                   <h2 className="text-lg sm:text-xl font-bold font-display">AI Shopping Assistant</h2>
-                   <p className="text-xs sm:text-sm text-white/80 hidden sm:block">Get personalized recommendations & instant help</p>
-                 </div>
-              </div>
-              
-              {/* Status indicator */}
-              <div className="hidden md:flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-xs md:text-sm font-medium">Online & Ready</span>
-              </div>
-            </div>
-
-            {/* Right side - Close button */}
-                          <button
-                onClick={closeChat}
-                className="flex items-center space-x-2 sm:space-x-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/50 group"
-                aria-label="Close chat"
-              >
-                <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white group-hover:rotate-90 transition-transform duration-300" />
-                <span className="hidden md:inline font-semibold text-white text-sm md:text-base">Close Chat</span>
-              </button>
-          </div>
-        </div>
+      {/* Simple Close Button */}
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={closeChat}
+          className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors duration-200 shadow-md"
+          aria-label="Close chat"
+        >
+          <XMarkIcon className="h-6 w-6 text-gray-600" />
+        </button>
       </div>
 
-            <div ref={chatPanelBodyRef} className="flex-1 overflow-y-auto scroll-smooth px-4 pb-4 pt-28 md:pt-4 relative">
-        
-        {/* History viewing indicator */}
-        {isViewingHistory && (
-          <div className="sticky top-0 z-10 mb-4 p-3 bg-blue-100 border border-blue-300 rounded-lg text-blue-800 text-sm animate-fade-in-up">
-            <div className="flex items-center justify-between">
-              <span>📚 Viewing conversation history</span>
-              <button 
-                onClick={() => {
-                  if (chatPanelBodyRef.current) {
-                    chatPanelBodyRef.current.scrollTop = chatPanelBodyRef.current.scrollHeight;
-                  }
-                }}
-                className="text-blue-600 hover:text-blue-800 underline text-xs"
-              >
-                Return to current
-              </button>
-            </div>
-          </div>
-                 )}
-        
-        <div className="flex flex-col space-y-3 min-h-full">
-          {/* Historical Conversations */}
-          {isLoadingHistory && (
-            <div className="text-center py-4">
-              <div className="inline-flex items-center space-x-2 text-gray-500">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
-                <span className="text-sm">Loading conversation history...</span>
+            <div ref={chatPanelBodyRef} className="flex-1 overflow-y-auto scroll-smooth px-4 pb-4 pt-24 md:pt-16 relative">
+          
+          {/* Scroll Up Indicator - shows when there are previous turns to see */}
+          {!isScrollingUp && currentTurnMessages.length > 0 && messages.some(m => !currentTurnMessages.includes(m.id)) && (
+            <div className="sticky top-0 z-10 mb-4 p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm animate-fade-in-up text-center">
+              <div className="flex items-center justify-center space-x-2">
+                <span>👆 Scroll up to see previous conversation</span>
               </div>
             </div>
           )}
-          
-          {historicalConversations.map(conversation => (
-            <div key={conversation.transcript._id} className="border-b border-gray-200 pb-3 mb-3">
-              {/* Conversation Header */}
-              <button
-                onClick={() => toggleHistoricalConversation(conversation.transcript._id)}
-                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-700">
-                      Previous Conversation
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatConversationDate(conversation.transcript.created)}
-                    </p>
-                  </div>
-                </div>
-                <ChevronRightIcon className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${conversation.expanded ? 'transform rotate-90' : ''}`} />
-              </button>
-              
-              {/* Historical Messages */}
-              {conversation.expanded && (
-                <div className="mt-3 space-y-2 pl-4 border-l-2 border-gray-200">
-                  {conversation.messages.slice(0, 10).map((msg, msgIndex) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[80%] p-2 rounded-lg text-sm ${
-                          msg.sender === 'user'
-                            ? 'bg-primary-100 text-primary-800'
-                            : 'bg-gray-100 text-gray-700'
-                        } opacity-75`}
-                      >
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                  {conversation.messages.length > 10 && (
-                    <p className="text-xs text-gray-500 text-center italic">
-                      ... and {conversation.messages.length - 10} more messages
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-          
-          {/* Current Conversation Messages */}
-          {(() => {
-            const agentTextMessages = messages.filter(m => m.type === 'text' && m.sender === 'agent');
-            return messages.map((msg, index) => {
-            const styling = getMessageStyling(msg, index, agentTextMessages);
-            
-            // Determine if this message should be visible
-            const isCurrentTurn = currentTurnMessages.includes(msg.id);
-            const shouldShow = isViewingHistory || isCurrentTurn;
-            
-            // Apply stronger hiding for non-current turn messages
-            const opacity = shouldShow ? styling.opacity : 'opacity-0';
-            const scale = shouldShow ? 'scale-100' : 'scale-75';
-            const transform = shouldShow ? 'translate-y-0' : 'translate-y-4';
-            const visibility = shouldShow ? 'visible' : 'invisible';
-            const display = shouldShow ? 'flex' : 'hidden';
-            
-                          return (
-                <div key={msg.id} className={`${display} flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} transition-all duration-500 ease-in-out ${opacity} ${scale} ${transform} ${visibility}`}>
-                                  {(msg.type === 'text' || msg.type === 'error' || (msg.type === 'loading' && msg.sender === 'system')) && (
-                    <div 
-                      className={`max-w-[85%] p-2 break-words transition-all duration-500 ease-in-out ${styling.textSize} ${
-                        msg.sender === 'user' ? 'text-primary-700 font-medium animate-fade-in-up' :
-                        msg.sender === 'agent' ? 'text-gray-800' :
-                        msg.type === 'error' ? 'text-red-700 animate-fade-in-up' :
-                        msg.type === 'loading' ? 'text-gray-500 italic text-sm text-center w-full' :
-                        'text-blue-700 animate-fade-in-up' // Other system messages
-                      }`}
-                    >
-                    {msg.type === 'loading' ? (
-                      <ThinkingEffect />
-                    ) : msg.sender === 'agent' && msg.type === 'text' ? (
-                      <TypewriterText 
-                        text={msg.content || ''} 
-                        speed={30}
-                        className={styling.textSize}
-                      />
-                    ) : (
-                      msg.content
-                    )}
-                    {msg.type === 'error' && msg.payload?.details && (
-                      <details className="mt-3 text-xs cursor-pointer">
-                        <summary className="font-semibold hover:text-red-800 transition-colors">Details</summary>
-                        <pre className="whitespace-pre-wrap bg-white/80 p-3 rounded-lg mt-2 text-gray-600 border border-red-200">{JSON.stringify(msg.payload.details, null, 2)}</pre>
-                      </details>
-                    )}
-                  </div>
-                )}
-            {msg.type === 'buttons' && msg.payload?.buttons && (
-              <div className="w-full grid grid-cols-2 gap-3 mt-3 self-start">
-                {msg.payload.buttons.map((button: VoiceflowButton, index: number) => (
-                  <button
-                    key={`${msg.id}-button-${index}`}
-                    onClick={() => handleButtonChoiceClick(button.request, button.name)}
-                    disabled={isLoading}
-                    className="bg-white border-2 border-primary-200 hover:border-primary-400 hover:bg-primary-50 text-primary-700 hover:text-primary-900 font-semibold text-base md:text-lg py-4 px-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none text-center"
-                  >
-                    {button.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            {msg.type === 'carousel' && msg.payload?.carouselData && (() => {
-              const carouselType = msg.payload.carouselData.metadata?.carouselType;
-              const carouselErrorMessage = msg.payload.carouselData.metadata?.message;
 
-              if (carouselType === 'error') {
-                return (
-                  <div className="w-full max-w-[85%] p-3 rounded-lg bg-red-100 text-red-700 border border-red-300 self-start mt-1">
-                    <p className="font-semibold">Error</p>
-                    <p>{carouselErrorMessage || 'An error occurred displaying this content.'}</p>
-                  </div>
-                );
+          <div className="flex flex-col space-y-3 min-h-full">
+            {/* Current Conversation Messages */}
+            {messages.map((msg, index) => {
+              // Skip rendering if we're showing an options modal and this is the triggering carousel
+              if (showOptionsModal && msg.type === 'carousel') {
+                return null;
               }
 
-              // Always show products carousel with enhanced 2x2 grid
+              // Determine visibility: show all when scrolling up, only current turn when at bottom
+              const isCurrentTurn = currentTurnMessages.includes(msg.id);
+              const shouldShow = isScrollingUp || isCurrentTurn;
+
+              // If message shouldn't be shown, return null (completely hidden)
+              if (!shouldShow) {
+                return null;
+              }
+
+              const styling = getMessageStyling(msg, index, messages.filter(m => m.type === 'text' && m.sender === 'agent'));
+
               return (
-                <div className="w-full mt-1 self-start">
-                  <ProductGridDisplay carousel={msg.payload.carouselData} onButtonClick={handleButtonChoiceClick} isLoading={isLoading} />
+                <div
+                  key={msg.id}
+                  className={`flex transition-all duration-300 ease-in-out ${
+                    msg.sender === 'user' ? 'justify-end' : 'justify-start'
+                  } ${isCurrentTurn ? 'opacity-100' : 'opacity-75'}`}
+                >
+                  {(msg.type === 'text' || msg.type === 'error' || (msg.type === 'loading' && msg.sender === 'system')) && (
+                    <div className={`max-w-[85%] p-2 break-words transition-all duration-500 ease-in-out ${styling.textSize} ${
+                      msg.sender === 'user' ? 'text-primary-700 font-medium animate-fade-in-up' :
+                      msg.sender === 'agent' ? 'text-gray-800' :
+                      msg.type === 'error' ? 'text-red-700 animate-fade-in-up' :
+                      msg.type === 'loading' ? 'text-gray-500 italic text-sm text-center w-full' :
+                      'text-blue-700 animate-fade-in-up' // Other system messages
+                    }`}>
+                      {msg.type === 'loading' ? (
+                        <ThinkingEffect />
+                      ) : msg.sender === 'agent' && msg.type === 'text' ? (
+                        <TypewriterText 
+                          text={msg.content || ''} 
+                          speed={30}
+                          className={styling.textSize}
+                        />
+                      ) : (
+                        msg.content
+                      )}
+                      {msg.type === 'error' && msg.payload?.details && (
+                        <details className="mt-3 text-xs cursor-pointer">
+                          <summary className="font-semibold hover:text-red-800 transition-colors">Details</summary>
+                          <pre className="whitespace-pre-wrap bg-white/80 p-3 rounded-lg mt-2 text-gray-600 border border-red-200">{JSON.stringify(msg.payload.details, null, 2)}</pre>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                  
+                  {msg.type === 'buttons' && msg.payload?.buttons && (
+                    <div className="w-full grid grid-cols-2 gap-3 mt-3 self-start">
+                      {msg.payload.buttons.map((button: VoiceflowButton, index: number) => (
+                        <button
+                          key={`${msg.id}-button-${index}`}
+                          onClick={() => handleButtonChoiceClick(button.request, button.name)}
+                          disabled={isLoading}
+                          className="bg-white border-2 border-primary-200 hover:border-primary-400 hover:bg-primary-50 text-primary-700 hover:text-primary-900 font-semibold text-base md:text-lg py-4 px-4 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-sm hover:shadow-md disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none text-center"
+                        >
+                          {button.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {msg.type === 'carousel' && msg.payload?.carouselData && (() => {
+                    const carouselType = msg.payload.carouselData.metadata?.carouselType;
+                    const carouselErrorMessage = msg.payload.carouselData.metadata?.message;
+
+                    if (carouselType === 'error') {
+                      return (
+                        <div className="w-full max-w-[85%] p-3 rounded-lg bg-red-100 text-red-700 border border-red-300 self-start mt-1">
+                          <p className="font-semibold">Error</p>
+                          <p>{carouselErrorMessage || 'An error occurred displaying this content.'}</p>
+                        </div>
+                      );
+                    }
+
+                    // Always show products carousel with enhanced 2x2 grid
+                    return (
+                      <div className="w-full mt-1 self-start">
+                        <ProductGridDisplay carousel={msg.payload.carouselData} onButtonClick={handleButtonChoiceClick} isLoading={isLoading} />
+                      </div>
+                    );
+                  })()}
                 </div>
               );
-            })()}
-              </div>
-            );
-          });
-        })()}
-        </div>
+            })}
+          </div>
         
-        <div ref={messagesEndRef} style={{ height: '1px' }} /> 
       </div>
 
       <form onSubmit={(e) => {

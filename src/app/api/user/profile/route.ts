@@ -51,14 +51,65 @@ export async function POST(request: NextRequest) {
       query = query.eq('phone', body.phone)
     }
 
-    const { data: customer, error: customerError } = await query.single()
+    let { data: customer, error: customerError } = await query.single()
 
+    // If no customer found and we have authUserId, create a new customer record
     if (customerError || !customer) {
-      return NextResponse.json({
-        error: 'customer_not_found',
-        message: 'No customer found with the provided identifier',
-        authenticated: false
-      }, { status: 404 })
+      if (body.authUserId) {
+        // Get the auth user's email from Supabase Auth
+        const { data: authUser, error: authError } = await supabase.auth.admin.getUserById(body.authUserId)
+        
+        if (authUser?.user?.email) {
+          // Create new customer record
+          const { data: newCustomer, error: createError } = await supabase
+            .from('customers')
+            .insert({
+              auth_user_id: body.authUserId,
+              email: authUser.user.email,
+              first_name: '',
+              last_name: '',
+              phone: '',
+              allergies: [],
+              dietary_restrictions: [],
+              preferences: {}
+            })
+            .select(`
+              id,
+              email,
+              first_name,
+              last_name,
+              phone,
+              allergies,
+              dietary_restrictions,
+              preferences,
+              created_at,
+              last_order_at
+            `)
+            .single()
+
+          if (createError) {
+            console.error('Error creating customer:', createError)
+            return NextResponse.json({
+              error: 'failed_to_create_customer',
+              message: 'Could not create customer profile'
+            }, { status: 500 })
+          }
+
+          // Continue with the newly created customer
+          customer = newCustomer
+        } else {
+          return NextResponse.json({
+            error: 'auth_user_not_found',
+            message: 'Could not retrieve authenticated user information'
+          }, { status: 404 })
+        }
+      } else {
+        return NextResponse.json({
+          error: 'customer_not_found',
+          message: 'No customer found with the provided identifier',
+          authenticated: false
+        }, { status: 404 })
+      }
     }
 
     // Get customer's order history
@@ -126,6 +177,10 @@ export async function POST(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(5)
 
+    // Calculate stats
+    const totalSpent = orderHistory.reduce((sum, order) => sum + parseFloat(order.total), 0)
+    const tier = orderHistory.length >= 10 ? 'premium' : orderHistory.length >= 5 ? 'vip' : orderHistory.length >= 1 ? 'returning' : 'new'
+
     // Create profile summary
     const profile = {
       id: customer.id,
@@ -137,17 +192,21 @@ export async function POST(request: NextRequest) {
       allergies: customer.allergies || [],
       dietaryRestrictions: customer.dietary_restrictions || [],
       preferences: customer.preferences || {},
-      memberSince: customer.created_at,
-      lastOrderDate: customer.last_order_at,
+      stats: {
+        totalOrders: orderHistory.length,
+        totalSpent: totalSpent.toFixed(2),
+        memberSince: customer.created_at,
+        lastOrderDate: customer.last_order_at || orderHistory[0]?.date
+      },
+      tier,
       authenticated: true,
       isVip: orderHistory.length >= 5, // 5+ orders = VIP
-      role: orderHistory.length >= 10 ? 'premium' : orderHistory.length >= 5 ? 'vip' : 'authenticated'
+      role: tier
     }
 
     // Create contextual summary for chatbot
     const orderCount = orderHistory.length
     const lastOrderDate = orderHistory[0]?.date
-    const totalSpent = orderHistory.reduce((sum, order) => sum + parseFloat(order.total), 0)
     
     let welcomeMessage = `Welcome back, ${profile.firstName || 'valued customer'}! `
     

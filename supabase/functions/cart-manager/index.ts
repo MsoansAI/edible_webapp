@@ -1,362 +1,219 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+};
+
+// V3: Find existing item with the same product and option for intelligent 'add'
+async function findExistingItem(supabase: SupabaseClient, cartId: string, productId: string, productOptionId: string | null) {
+  let query = supabase
+    .from('cart_items')
+    .select('id, quantity')
+    .eq('cart_id', cartId)
+    .eq('product_id', productId);
+  
+  if (productOptionId) {
+    query = query.eq('product_option_id', productOptionId);
+  } else {
+    query = query.is('product_option_id', null);
+  }
+  
+  const { data, error } = await query.limit(1).single();
+  
+  if (error && error.code !== 'PGRST116') { // Ignore 'PGRST116' (no rows)
+    console.error('Error finding existing item:', error);
+  }
+  
+  return data;
 }
 
-interface CartRequest {
-  action: 'add' | 'get' | 'update' | 'remove' | 'clear' | 'summary' | 'validate'
-  productId?: string
-  optionId?: string
-  quantity?: number
-  cartData?: any
-}
-
-serve(async (req) => {
-  // Handle CORS preflight requests
+// V2: Main Deno serve function
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    
+    // --- Rate Limiting ---
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
 
-    const { action, productId, optionId, quantity = 1, cartData }: CartRequest = await req.json()
+    const { data: rateLimitData, error: rateLimitError } = await supabase
+      .from('api_rate_limits')
+      .select('request_count')
+      .eq('identifier', clientIP)
+      .eq('endpoint', 'cart-manager')
+      .gte('window_start', new Date(Date.now() - 60000).toISOString())
+      .single();
 
-    switch (action) {
-      case 'validate':
-        // Validate cart items against database
-        if (!cartData || !cartData.items) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              message: 'No cart data provided' 
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400 
-            }
-          )
-        }
-
-        const productIds = cartData.items.map((item: any) => item.product.id)
-        const optionIds = cartData.items
-          .filter((item: any) => item.option)
-          .map((item: any) => item.option.id)
-
-        // Validate products exist and are active
-        const { data: products, error: productError } = await supabase
-          .from('products')
-          .select('id, name, base_price, is_active')
-          .in('id', productIds)
-          .eq('is_active', true)
-
-        if (productError) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              message: 'Error validating products',
-              error: productError 
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 500 
-            }
-          )
-        }
-
-        // Validate options if any
-        let options = []
-        if (optionIds.length > 0) {
-          const { data: optionsData, error: optionError } = await supabase
-            .from('product_options')
-            .select('id, product_id, option_name, price, is_available')
-            .in('id', optionIds)
-            .eq('is_available', true)
-
-          if (optionError) {
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                message: 'Error validating options',
-                error: optionError 
-              }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500 
-              }
-            )
-          }
-          options = optionsData || []
-        }
-
-        // Check for invalid items
-        const validProductIds = new Set(products?.map(p => p.id) || [])
-        const validOptionIds = new Set(options.map(o => o.id))
-        
-        const invalidItems = cartData.items.filter((item: any) => {
-          const productValid = validProductIds.has(item.product.id)
-          const optionValid = !item.option || validOptionIds.has(item.option.id)
-          return !productValid || !optionValid
-        })
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            validation: {
-              isValid: invalidItems.length === 0,
-              validProducts: products?.length || 0,
-              validOptions: options.length,
-              invalidItems: invalidItems.map((item: any) => ({
-                productId: item.product.id,
-                productName: item.product.name,
-                optionId: item.option?.id,
-                reason: !validProductIds.has(item.product.id) 
-                  ? 'Product not found or inactive'
-                  : 'Option not found or unavailable'
-              }))
-            }
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-
-      case 'get':
-        // Get product details for adding to cart
-        if (!productId) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              message: 'Product ID required' 
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400 
-            }
-          )
-        }
-
-        const { data: product, error: getError } = await supabase
-          .from('products')
-          .select(`
-            id,
-            product_identifier,
-            name,
-            description,
-            base_price,
-            image_url,
-            is_active,
-            product_options (
-              id,
-              option_name,
-              price,
-              description,
-              image_url,
-              is_available
-            )
-          `)
-          .eq('id', productId)
-          .eq('is_active', true)
-          .single()
-
-        if (getError || !product) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              message: 'Product not found or inactive',
-              error: getError 
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 404 
-            }
-          )
-        }
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            product: {
-              ...product,
-              availableOptions: product.product_options?.filter((opt: any) => opt.is_available) || []
-            },
-            action: 'product_details',
-            data: {
-              clientAction: {
-                type: 'SHOW_PRODUCT_DETAILS',
-                payload: { product }
-              }
-            }
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-
-      case 'add':
-        // Add item to cart with validation
-        if (!productId) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              message: 'Product ID required for adding to cart' 
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400 
-            }
-          )
-        }
-
-        // Validate product exists
-        const { data: addProduct, error: addError } = await supabase
-          .from('products')
-          .select('*')
-          .eq('id', productId)
-          .eq('is_active', true)
-          .single()
-
-        if (addError || !addProduct) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              message: 'Product not found or inactive' 
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 404 
-            }
-          )
-        }
-
-        // Validate option if provided
-        let option = null
-        if (optionId) {
-          const { data: optionData, error: optionError } = await supabase
-            .from('product_options')
-            .select('*')
-            .eq('id', optionId)
-            .eq('product_id', productId)
-            .eq('is_available', true)
-            .single()
-
-          if (optionError || !optionData) {
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                message: 'Option not found or unavailable' 
-              }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 404 
-              }
-            )
-          }
-          option = optionData
-        }
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: `Added ${quantity} ${addProduct.name}${option ? ` (${option.option_name})` : ''} to cart`,
-            action: 'add_to_cart',
-            data: {
-              product: addProduct,
-              option: option,
-              quantity: quantity,
-              clientAction: {
-                type: 'ADD_TO_CART',
-                payload: { 
-                  product: addProduct, 
-                  option: option, 
-                  quantity: quantity 
-                }
-              }
-            }
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-
-      case 'summary':
-        // Provide cart summary for chatbot
-        if (!cartData || !cartData.items) {
-          return new Response(
-            JSON.stringify({
-              success: true,
-              summary: {
-                itemCount: 0,
-                subtotal: 0,
-                tax: 0,
-                shipping: 0,
-                total: 0,
-                freeShippingEligible: false,
-                items: [],
-                message: 'Your cart is empty'
-              }
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
-        const subtotal = cartData.items.reduce((total: number, item: any) => {
-          const price = item.option ? item.option.price : item.product.base_price
-          return total + (price * item.quantity)
-        }, 0)
-        
-        const tax = subtotal * 0.0825
-        const shipping = subtotal >= 65 ? 0 : 9.99
-        const total = subtotal + tax + shipping
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            summary: {
-              itemCount: cartData.items.reduce((count: number, item: any) => count + item.quantity, 0),
-              subtotal: subtotal,
-              tax: tax,
-              shipping: shipping,
-              total: total,
-              freeShippingEligible: subtotal >= 65,
-              items: cartData.items.map((item: any) => ({
-                name: item.product.name,
-                option: item.option?.option_name,
-                quantity: item.quantity,
-                price: item.option ? item.option.price : item.product.base_price,
-                total: (item.option ? item.option.price : item.product.base_price) * item.quantity
-              })),
-              message: `You have ${cartData.items.length} different item${cartData.items.length !== 1 ? 's' : ''} in your cart`
-            }
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-
-      default:
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            message: 'Invalid action. Supported: add, get, validate, summary' 
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        )
+    if (rateLimitData && rateLimitData.request_count >= 30) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-  } catch (error) {
-    console.error('Cart manager error:', error)
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: 'Internal server error',
-        error: error.message 
-      }),
-      { 
+    if (rateLimitError && rateLimitError.code !== 'PGRST116') {
+      console.error('Rate limit check error:', rateLimitError);
+    } else {
+      await supabase.from('api_rate_limits').upsert({
+        identifier: clientIP,
+        endpoint: 'cart-manager',
+        request_count: (rateLimitData?.request_count || 0) + 1,
+        window_start: new Date().toISOString()
+      }, { onConflict: 'identifier, endpoint' });
+    }
+
+    // --- Routing ---
+    const url = new URL(req.url);
+    const cartId = url.searchParams.get('cartId');
+    const createNew = url.searchParams.get('new') === 'true';
+
+    // GET /?cartId=<uuid> - Retrieve cart details
+    if (req.method === 'GET' && cartId) {
+      const { data, error } = await supabase
+        .from('carts')
+        .select(`
+          id,
+          created_at,
+          updated_at,
+          cart_items (
+            id,
+            quantity,
+            products (id, name, base_price, images),
+            product_options (id, option_name, price)
+          )
+        `)
+        .eq('id', cartId)
+        .single();
+      
+      if (error) throw error;
+      
+      return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
+      });
+    }
+
+    // POST /?new=true - Create a new cart
+    if (req.method === 'POST' && createNew) {
+      const { data, error } = await supabase
+        .from('carts')
+        .insert({})
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      return new Response(JSON.stringify(data), {
+        status: 201,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // POST / - Add/update item in cart
+    if (req.method === 'POST') {
+      const { cartId, productId, productOptionId, quantity } = await req.json();
+      
+      if (!cartId || !productId || !quantity) {
+        return new Response(JSON.stringify({ error: 'cartId, productId, and quantity are required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
-    )
+
+      // V3: Check for existing item with the same product and option
+      const existingItem = await findExistingItem(supabase, cartId, productId, productOptionId);
+
+      if (existingItem) {
+        // Item exists, update its quantity
+        const newQuantity = existingItem.quantity + quantity;
+        const { data, error } = await supabase
+          .from('cart_items')
+          .update({ quantity: newQuantity, updated_at: new Date().toISOString() })
+          .eq('id', existingItem.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        
+        // V3: Also update the cart's updated_at timestamp
+        await supabase.from('carts').update({ updated_at: new Date().toISOString() }).eq('id', cartId);
+        
+        return new Response(JSON.stringify(data), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } else {
+        // Item does not exist, add it
+        const { data, error } = await supabase
+          .from('cart_items')
+          .insert({
+            cart_id: cartId,
+            product_id: productId,
+            product_option_id: productOptionId,
+            quantity: quantity,
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+
+        // V3: Also update the cart's updated_at timestamp
+        await supabase.from('carts').update({ updated_at: new Date().toISOString() }).eq('id', cartId);
+
+        return new Response(JSON.stringify(data), {
+          status: 201,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // DELETE / - Remove item from cart
+    if (req.method === 'DELETE') {
+      const { cartId, itemId } = await req.json();
+
+      if (!cartId || !itemId) {
+        return new Response(JSON.stringify({ error: 'cartId and itemId are required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { error } = await supabase
+        .from('cart_items')
+        .delete()
+        .eq('id', itemId)
+        .eq('cart_id', cartId);
+        
+      if (error) throw error;
+
+      // V3: Also update the cart's updated_at timestamp
+      await supabase.from('carts').update({ updated_at: new Date().toISOString() }).eq('id', cartId);
+      
+      return new Response(JSON.stringify({ success: true, message: 'Item removed from cart' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: 'Invalid request' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error: any) {
+    console.error('Cart manager error:', error);
+    return new Response(JSON.stringify({ error: 'Internal Server Error', details: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
-}) 
+}); 

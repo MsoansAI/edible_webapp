@@ -2,6 +2,12 @@ import { useCartStore } from '@/store/cartStore'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 
+export interface VoiceflowTrace {
+  type: string;
+  payload: any;
+  processed?: boolean;
+}
+
 export interface VoiceflowCustomAction {
   type: string
   payload: any
@@ -164,6 +170,8 @@ export const handleVoiceflowAction = async (action: VoiceflowCustomAction): Prom
       const { clearCart } = useCartStore.getState()
       clearCart()
       toast.success('Cart cleared')
+      // Dispatch a custom event to notify the UI to re-render
+      window.dispatchEvent(new CustomEvent('cart-updated'));
       break
 
     case 'remove-item':
@@ -171,6 +179,8 @@ export const handleVoiceflowAction = async (action: VoiceflowCustomAction): Prom
         const { removeItem } = useCartStore.getState()
         removeItem(action.payload.productId, action.payload.optionId)
         toast.success('Item removed from cart')
+        // Dispatch a custom event to notify the UI to re-render
+        window.dispatchEvent(new CustomEvent('cart-updated'));
       }
       break
 
@@ -207,26 +217,49 @@ export const handleVoiceflowAction = async (action: VoiceflowCustomAction): Prom
 }
 
 /**
- * Processes Voiceflow traces and handles any custom actions
+ * Processes an array of Voiceflow traces to handle custom actions.
+ * It identifies custom action traces and calls the appropriate handler.
  */
-export const processVoiceflowTraces = async (traces: any[]): Promise<any[]> => {
-  const processedTraces = []
-
+export const processVoiceflowTraces = async (traces: VoiceflowTrace[]): Promise<VoiceflowTrace[]> => {
   for (const trace of traces) {
-    // Check for custom action traces
-    if (trace.type === 'custom' && trace.payload?.action) {
-      await handleVoiceflowAction(trace.payload.action)
-      // Keep the trace for display but mark it as processed
-      processedTraces.push({
-        ...trace,
-        processed: true
-      })
-    } else {
-      processedTraces.push(trace)
+    let actionToHandle: VoiceflowCustomAction | null = null;
+
+    // This handles the structure we've seen: { type: "clear-cart", payload: { type: "custom", ... } }
+    // It checks if the trace type itself is a recognized action.
+    if (isKnownActionType(trace.type)) {
+      actionToHandle = { type: trace.type, payload: trace.payload || {} };
+      console.log(`Processing direct action trace: ${trace.type}`);
+    }
+    // This handles the standard structure: { type: "custom", payload: { action: { ... } } }
+    else if (trace.type === 'custom' && trace.payload?.action) {
+      actionToHandle = trace.payload.action;
+      console.log(`Processing custom action payload: ${actionToHandle!.type}`);
+    }
+
+    if (actionToHandle) {
+      await handleVoiceflowAction(actionToHandle);
+      // Mark trace as processed so it's not handled again by other parts of the UI
+      (trace as any).processed = true;
     }
   }
+  return traces;
+};
 
-  return processedTraces
+/**
+ * A helper function to check if a given trace type string
+ * matches one of our known custom action names.
+ */
+function isKnownActionType(type: string): boolean {
+  const knownActions = [
+    'add-to-cart', 
+    'update-cart', 
+    'remove-item', 
+    'clear-cart', 
+    'checkout-page', 
+    'navigate', 
+    'show-notification'
+  ];
+  return knownActions.includes(type);
 }
 
 /**

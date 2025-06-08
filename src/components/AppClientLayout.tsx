@@ -4,6 +4,7 @@ import { useUIStore } from '@/store/uiStore';
 import ChatLauncher from '@/components/ChatLauncher';
 import ChatPanel from '@/components/ChatPanel';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import { Toaster } from 'react-hot-toast';
 
 interface AppClientLayoutProps {
@@ -24,6 +25,7 @@ export default function AppClientLayout({ children }: AppClientLayoutProps) {
         `}
       >
         <main className="flex-1 flex flex-col w-full">{children}</main>
+        <Footer />
       </div>
 
       <ChatPanel />
