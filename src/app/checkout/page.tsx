@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { CreditCardIcon, TruckIcon } from '@heroicons/react/24/outline'
 import { useCartStore } from '@/store/cartStore'
@@ -16,6 +16,12 @@ export default function CheckoutPage() {
   const tax = subtotal * 0.0825
   const shipping = subtotal >= 65 ? 0 : 9.99
   const total = subtotal + tax + shipping
+
+  useEffect(() => {
+    if (items.length === 0) {
+      router.push('/cart')
+    }
+  }, [items, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,7 +43,6 @@ export default function CheckoutPage() {
   }
 
   if (items.length === 0) {
-    router.push('/cart')
     return null
   }
 
