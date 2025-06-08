@@ -24,13 +24,35 @@ The system is built on a modern, serverless architecture designed for scalabilit
 -   **Database:** [Supabase PostgreSQL](https://supabase.com/docs/database) with a hybrid normalized/denormalized schema for transactional integrity and AI performance.
 -   **AI & Integrations:** [Voiceflow](https://www.voiceflow.com/) for conversational logic, [OpenAI](https://openai.com/) for NLP, and [VAPI](https://vapi.ai/) for telephony.
 
-For a complete breakdown of the project's components, data flow, and technical implementation, please see our detailed documentation:
+## 📚 Project Documentation
 
--   **[System Overview](./docs/SYSTEM_OVERVIEW.md)**: A high-level look at the project's goals, components, and user flow.
--   **[Technical Architecture](./docs/ARCHITECTURE.md)**: A detailed guide to the frontend, backend, and integration architecture.
--   **[Database Schema Guide](./docs/DATABASE.md)**: An explanation of the database structure, tables, and design philosophy.
+This project is supported by comprehensive documentation located in the `/docs` directory. For a new developer, we recommend reading the documents in the following order to get a full understanding of the system.
 
-## Getting Started
+### Suggested Reading Path
+
+1.  **[System Overview](./docs/SYSTEM_OVERVIEW.md)**: Start here for a high-level look at the project's goals, components, and user flows.
+2.  **[Architecture Guide](./docs/ARCHITECTURE.md)**: A detailed guide to the frontend, backend, and integration architecture.
+3.  **[Edge Functions Guide](./docs/EDGE_FUNCTIONS_GUIDE.md)**: The complete API reference for all backend serverless functions.
+4.  **[Database Schema Guide](./docs/DATABASE.md)**: An explanation of the database structure, tables, and design philosophy.
+5.  **[Voiceflow & AI Integration](./docs/AI_AGENT_INTEGRATION.md)**: Explains how the AI agent connects to the backend.
+
+### Key Documents & Guides
+
+-   **High-Level Overviews**
+    -   `SYSTEM_OVERVIEW.md`: The "what" and "why" of the project.
+    -   `ARCHITECTURE.md`: The "how" it all fits together.
+-   **Backend & API**
+    -   `EDGE_FUNCTIONS_GUIDE.md`: The definitive API reference for all backend functions.
+    -   `DATABASE.md` & `DATABASE_STRUCTURE.md`: Deep dives into the PostgreSQL database.
+-   **Voiceflow Integration**
+    -   `AI_AGENT_INTEGRATION.md`: Shows how Voiceflow uses the backend APIs.
+    -   `voiceflow-llm-master-prompt.md`: The core "brain" and logic for the AI agent.
+    -   `voiceflow-tools-schema.json`: The machine-readable schema of the AI's tools.
+    -   `voiceflow-api-examples.js`: Practical code examples for Voiceflow integration.
+-   **Security**
+    -   `SECURITY_GUIDE.md`: Details on Rate Limiting, RLS, and other security measures.
+
+## 🚀 Getting Started
 
 ### Prerequisites
 

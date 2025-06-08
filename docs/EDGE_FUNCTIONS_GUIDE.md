@@ -5,12 +5,14 @@ Complete API documentation for the Edible Arrangements Voiceflow integration bac
 ## Deployed Functions
 
 | Function | Version | Purpose | Rate Limit |
-|----------|---------|---------|------------|
+|---|---|---|---|
 | `product-search` | v14 | AI-powered product discovery | 30/min |
+| `cart-manager` | v1 | Real-time cart operations | 50/min |
 | `customer-management` | v4 | Customer account operations | 20/min |
 | `franchisee-inventory` | v8 | Store location & inventory | 15/min |
 | `order` | v16 | Complete order management | 20/min |
 | `order-items` | v9 | Order modification & items | 15/min |
+| `user-profile` | v1 | User context for chatbot | 40/min |
 | `generate-embedding` | v5 | AI embedding generation | 10/min |
 
 ---
@@ -72,6 +74,75 @@ Complete API documentation for the Edible Arrangements Voiceflow integration bac
 
 ---
 
+## Cart Management API
+
+**Endpoint**: `POST /functions/v1/cart-manager`
+
+### Real-time Cart Validation and Enrichment
+- Validates cart items against the database for price and availability.
+- Enriches cart with up-to-date product details and images.
+- Calculates subtotal, taxes, and shipping costs.
+
+### Request (`validate` action)
+```json
+{
+  "action": "validate",
+  "cartItems": [
+    {
+      "productId": "prod-uuid-123",
+      "optionId": "opt-uuid-456",
+      "quantity": 2
+    },
+    {
+      "productId": "prod-uuid-789",
+      "quantity": 1
+    }
+  ]
+}
+```
+
+### Response
+```json
+{
+  "isValid": true,
+  "validatedCart": {
+    "items": [
+      {
+        "productId": "prod-uuid-123",
+        "optionId": "opt-uuid-456",
+        "quantity": 2,
+        "name": "Chocolate Dipped Strawberries",
+        "optionName": "Large Box",
+        "unitPrice": "64.99",
+        "totalPrice": "129.98",
+        "imageUrl": "https://..."
+      },
+      {
+        "productId": "prod-uuid-789",
+        "quantity": 1,
+        "name": "Fruit Bouquet",
+        "unitPrice": "45.00",
+        "totalPrice": "45.00",
+        "imageUrl": "https://..."
+      }
+    ],
+    "summary": {
+      "itemCount": 3,
+      "subtotal": "174.98",
+      "tax": "14.44",
+      "shipping": "0.00",
+      "total": "189.42",
+      "freeShippingEligible": true
+    }
+  },
+  "warnings": [
+    "Item 'Fruit Bouquet' is low in stock at your selected store."
+  ]
+}
+```
+
+---
+
 ## Customer Management API
 
 **Endpoint**: `POST /functions/v1/customer-management`
@@ -126,7 +197,7 @@ Complete API documentation for the Edible Arrangements Voiceflow integration bac
 
 ---
 
-## Store Location API
+## Franchisee Inventory API
 
 **Endpoint**: `GET /functions/v1/franchisee-inventory/find-nearest`
 
@@ -270,8 +341,9 @@ GET /functions/v1/order?customerId=customer-uuid&latest=true
 
 ### Advanced Order Modification
 - **Smart ADD**: Prevents duplicates, updates quantities instead
-- **Partial REMOVE**: Remove specific quantities, not entire line items
-- **Cancellation Prevention**: Blocks removing last items, redirects to live agent
+- **Partial REMOVE**: Supports quantity-based removal
+- **Cancellation Prevention**: Smart handoff to live agent
+- **Real-time Recalculation**: Pricing is updated with every change
 
 ### Request
 ```json
@@ -280,80 +352,83 @@ GET /functions/v1/order?customerId=customer-uuid&latest=true
   "items": [
     {
       "action": "add",
-      "productId": "3075",
-      "optionName": "Large",
-      "quantity": 2
+      "productId": "4088",
+      "optionName": "Classic",
+      "quantity": 1
     },
     {
       "action": "remove",
-      "productId": "3076",
-      "optionName": "Small",
-      "quantity": 1                         // Partial removal
-    },
-    {
-      "action": "update",
-      "productId": "3077",
-      "optionName": "Medium",
-      "newQuantity": 3
+      "productId": "3075",
+      "optionName": "Large"
     }
   ]
 }
 ```
 
-### Response - Normal Operation
+### Response
 ```json
 {
+  "success": true,
   "order": {
     "orderNumber": "W25710000001-1",
-    "status": "pending",
-    "items": [
-      {
-        "productName": "Chocolate Dipped Strawberries",
-        "optionName": "Large",
-        "quantity": 3,                      // Updated from smart ADD
-        "unitPrice": "64.99",
-        "totalPrice": "194.97"
-      }
-    ],
+    "status": "pending-update",
     "pricing": {
-      "subtotal": "194.97",
-      "taxAmount": "16.09",
-      "totalAmount": "211.06"
+      "previousTotal": "75.75",
+      "newTotal": "45.21",
+      "change": "-30.54"
     }
   },
-  "changes": [
-    "Added 2 Chocolate Dipped Strawberries (Large) - updated existing quantity to 3",
-    "Removed 1 Small Fruit Arrangement"
-  ],
-  "summary": "Order updated successfully. New total: $211.06"
-}
-```
-
-### Response - Cancellation Prevention
-```json
-{
-  "action": "cancellation_request",
-  "voiceflowAction": {
-    "type": "redirect_to_live_agent",
-    "reason": "order_cancellation",
-    "context": {
-      "orderNumber": "W25710000001-1",
-      "currentTotal": "$75.75",
-      "customerIntent": "cancel_entire_order"
-    }
-  },
-  "blocked": true,
-  "message": "I understand you want to remove all items. Let me connect you with a live agent who can help with cancellations."
+  "summary": "Order updated successfully. Your new total is $45.21"
 }
 ```
 
 ---
 
-## AI Embedding Generation
+## User Profile API
+
+**Endpoint**: `POST /functions/v1/user-profile`
+
+### Chatbot Context Enrichment
+- Fetches a comprehensive user profile for personalizing conversations.
+- Provides authentication status, contact details, and order history.
+- Used to create the `context` object for Voiceflow.
+
+### Request
+```json
+{
+  "userId": "auth-user-uuid-123"
+}
+```
+
+### Response
+```json
+{
+  "profile": {
+    "isAuthenticated": true,
+    "userId": "auth-user-uuid-123",
+    "userName": "Jane Doe",
+    "userEmail": "jane.doe@example.com",
+    "userRole": "authenticated",
+    "lastOrderDate": "2024-05-10",
+    "preferredDeliveryZip": "90210",
+    "lifetimeValue": 450.75
+  },
+  "summary": "Returning customer with 5 previous orders."
+}
+```
+
+---
+
+## Generate Embedding API
 
 **Endpoint**: `POST /functions/v1/generate-embedding`
 
-### Generate Product Embeddings
+### AI Search Vector Generation
+- Converts product text into OpenAI vector embeddings
+- Used for AI-powered semantic search
+- Supports on-demand or batch regeneration
+
+### Request
 ```json
 {
   "productId": "3075",
@@ -451,5 +526,4 @@ GET /functions/v1/order?customerId=customer-uuid&latest=true
 2. Apply changes with `order-items` (PATCH)
 3. Handle cancellation prevention if needed
 4. Confirm new totals with customer
-
 This API provides a complete backend for conversational commerce with built-in intelligence for common customer service scenarios. 
