@@ -144,6 +144,8 @@ async function handleFindNearest(supabase: SupabaseClient, req: Request) {
       // Support GET with query parameters
       const url = new URL(req.url);
       const zipCode = url.searchParams.get('zipCode');
+      const storeNumber = url.searchParams.get('storeNumber');
+      
       if (!zipCode) {
         return new Response(JSON.stringify({
           error: 'Missing zipCode parameter'
@@ -155,14 +157,17 @@ async function handleFindNearest(supabase: SupabaseClient, req: Request) {
           }
         });
       }
+      
       requestData = {
         zipCode,
+        storeNumber: storeNumber || undefined,
         productId: url.searchParams.get('productId') || undefined,
-        radius: url.searchParams.get('radius') ? parseFloat(url.searchParams.get('radius')) : undefined
+        radius: url.searchParams.get('radius') ? parseFloat(url.searchParams.get('radius')!) : undefined
       };
     } else {
       requestData = await req.json();
     }
+
     if (!requestData.zipCode) {
       return new Response(JSON.stringify({
         error: 'zipCode is required'
@@ -174,13 +179,27 @@ async function handleFindNearest(supabase: SupabaseClient, req: Request) {
         }
       });
     }
+
+    // Check if this is a store validation request (both storeNumber and zipCode provided)
+    if (requestData.storeNumber) {
+      return await handleStoreValidation(supabase, requestData);
+    }
+
     // Find franchisee that serves this zip code
-    const { data: deliveryZone, error: zoneError } = await supabase.from('delivery_zones').select('*, franchisees!franchisee_id(*)').contains('zip_codes', [
-      requestData.zipCode
-    ]).single();
+    const { data: deliveryZone, error: zoneError } = await supabase
+      .from('delivery_zones')
+      .select('*, franchisees!franchisee_id(*)')
+      .contains('zip_codes', [requestData.zipCode])
+      .single();
+
     if (zoneError || !deliveryZone) {
       // Fallback: find nearest franchisee by looking up in flat data
-      const { data: franchiseeData, error: franchiseeError } = await supabase.from('chatbot_franchisees_flat').select('*').limit(1).single();
+      const { data: franchiseeData, error: franchiseeError } = await supabase
+        .from('chatbot_franchisees_flat')
+        .select('*')
+        .limit(1)
+        .single();
+
       if (franchiseeError || !franchiseeData) {
         return new Response(JSON.stringify({
           error: 'No delivery available',
@@ -193,11 +212,13 @@ async function handleFindNearest(supabase: SupabaseClient, req: Request) {
           }
         });
       }
+
       // Return pickup-only store
       const response = {
         store: streamlineStore(franchiseeData, null, false),
         summary: `Found your nearest store for pickup in ${requestData.zipCode}. Delivery not available to this area.`
       };
+
       return new Response(JSON.stringify(response), {
         status: 200,
         headers: {
@@ -206,9 +227,17 @@ async function handleFindNearest(supabase: SupabaseClient, req: Request) {
         }
       });
     }
+
     // Check product availability if specified
     if (requestData.productId) {
-      const { data: inventory, error: invError } = await supabase.from('inventory').select('quantity_available').eq('franchisee_id', deliveryZone.franchisee_id).eq('product_id', requestData.productId).gt('quantity_available', 0).single();
+      const { data: inventory, error: invError } = await supabase
+        .from('inventory')
+        .select('quantity_available')
+        .eq('franchisee_id', deliveryZone.franchisee_id)
+        .eq('product_id', requestData.productId)
+        .gt('quantity_available', 0)
+        .single();
+
       if (invError || !inventory) {
         return new Response(JSON.stringify({
           error: 'Product not available',
@@ -222,10 +251,16 @@ async function handleFindNearest(supabase: SupabaseClient, req: Request) {
         });
       }
     }
+
     const response = {
       store: streamlineStore(deliveryZone.franchisees, deliveryZone, true),
+      serviceArea: {
+        zipCodes: deliveryZone.zip_codes || [],
+        deliveryRadius: "15 miles"
+      },
       summary: `Perfect! I found your local store with delivery available to ${requestData.zipCode}.`
     };
+
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: {
@@ -238,6 +273,120 @@ async function handleFindNearest(supabase: SupabaseClient, req: Request) {
     throw error;
   }
 }
+
+async function handleStoreValidation(supabase: SupabaseClient, requestData: any) {
+  try {
+    // Find the specific store by store number
+    const { data: franchisee, error: franchiseeError } = await supabase
+      .from('franchisees')
+      .select('*')
+      .eq('store_number', parseInt(requestData.storeNumber || '0'))
+      .single();
+
+    if (franchiseeError || !franchisee) {
+      return new Response(JSON.stringify({
+        canDeliver: false,
+        error: 'Store not found',
+        message: `Store #${requestData.storeNumber} not found in our system`,
+        suggestion: 'Please verify the store number or use ZIP code lookup to find your nearest store'
+      }), {
+        status: 404,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+
+    // Check if this store delivers to the specified ZIP code
+    const { data: deliveryZone, error: zoneError } = await supabase
+      .from('delivery_zones')
+      .select('*')
+      .eq('franchisee_id', franchisee.id)
+      .contains('zip_codes', [requestData.zipCode])
+      .single();
+
+    if (zoneError || !deliveryZone) {
+      // Store doesn't deliver to this ZIP code - find alternative
+      const { data: nearestZone, error: nearestError } = await supabase
+        .from('delivery_zones')
+        .select('*, franchisees!franchisee_id(*)')
+        .contains('zip_codes', [requestData.zipCode])
+        .single();
+
+      const response: any = {
+        canDeliver: false,
+        store: {
+          storeNumber: franchisee.store_number.toString(),
+          name: franchisee.name || `Edible Arrangements #${franchisee.store_number}`,
+          address: `${franchisee.address}, ${franchisee.city}, ${franchisee.state}`,
+          phone: franchisee.phone
+        },
+        message: `Store #${requestData.storeNumber} does not deliver to ZIP code ${requestData.zipCode}`,
+        suggestion: 'This store offers pickup, or we can find a store that delivers to your area'
+      };
+
+      // Add nearest alternative if found
+      if (!nearestError && nearestZone?.franchisees) {
+        response.nearestAlternative = {
+          storeNumber: nearestZone.franchisees.store_number.toString(),
+          name: nearestZone.franchisees.name || `Edible Arrangements #${nearestZone.franchisees.store_number}`,
+          address: `${nearestZone.franchisees.address}, ${nearestZone.franchisees.city}, ${nearestZone.franchisees.state}`,
+          phone: nearestZone.franchisees.phone,
+          deliveryInfo: {
+            fee: deliveryZone?.delivery_fee ? `$${parseFloat(deliveryZone.delivery_fee).toFixed(2)}` : '5.99',
+            minimumOrder: deliveryZone?.min_order_amount ? `$${parseFloat(deliveryZone.min_order_amount).toFixed(2)}` : '25.00'
+          }
+        };
+      }
+
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+
+    // Store CAN deliver to this ZIP code
+    const deliveryFee = deliveryZone.delivery_fee ? parseFloat(deliveryZone.delivery_fee) : 5.99;
+    const minimumOrder = deliveryZone.min_order_amount ? parseFloat(deliveryZone.min_order_amount) : 25.00;
+
+    const response = {
+      canDeliver: true,
+      store: {
+        storeNumber: franchisee.store_number.toString(),
+        name: franchisee.name || `Edible Arrangements #${franchisee.store_number}`,
+        address: `${franchisee.address}, ${franchisee.city}, ${franchisee.state}`,
+        phone: franchisee.phone,
+        email: franchisee.email
+      },
+      deliveryInfo: {
+        fee: deliveryFee === 0 ? 'FREE' : `$${deliveryFee.toFixed(2)}`,
+        minimumOrder: `$${minimumOrder.toFixed(2)}`,
+        estimatedTime: 'Same day delivery available'
+      },
+      serviceArea: {
+        zipCodes: deliveryZone.zip_codes || [],
+        deliveryRadius: "15 miles"
+      },
+      summary: `Great! Store #${requestData.storeNumber} delivers to ${requestData.zipCode} for ${deliveryFee === 0 ? 'FREE' : `$${deliveryFee.toFixed(2)}`}`
+    };
+
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
+  } catch (error: any) {
+    console.error('Store validation error:', error);
+    throw error;
+  }
+}
+
 function streamlineStore(franchisee: any, deliveryZone: any = null, deliveryAvailable: boolean = false) {
   // Handle both direct franchisee data and flat data structure
   const storeData = franchisee.franchisee_data || franchisee;

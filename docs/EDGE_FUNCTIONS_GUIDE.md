@@ -201,12 +201,19 @@ Complete API documentation for the Edible Arrangements Voiceflow integration bac
 
 **Endpoint**: `GET /functions/v1/franchisee-inventory/find-nearest`
 
-### Find Store by ZIP Code
+### Two Usage Modes
+
+#### 1. Find Nearest Store (ZIP Code Only)
 ```
 GET /franchisee-inventory/find-nearest?zipCode=92101
 ```
 
-### Response
+#### 2. Validate Specific Store Delivery (Store + ZIP Code)
+```
+GET /franchisee-inventory/find-nearest?storeNumber=257&zipCode=92101
+```
+
+### Response (Find Nearest Mode)
 ```json
 {
   "store": {
@@ -246,6 +253,55 @@ GET /franchisee-inventory/find-nearest?zipCode=92101
     "deliveryRadius": "15 miles"
   },
   "summary": "Found your local store with same-day delivery available"
+}
+```
+
+### Response (Store Validation Mode - Can Deliver)
+```json
+{
+  "canDeliver": true,
+  "store": {
+    "storeNumber": "257",
+    "name": "Edible Arrangements #257",
+    "address": "4340 Genesee Ave, San Diego, CA 92117",
+    "phone": "(858) 585-4156",
+    "email": "ca257@edible.store"
+  },
+  "deliveryInfo": {
+    "fee": "$5.99",
+    "minimumOrder": "$25.00",
+    "estimatedTime": "Same day delivery available"
+  },
+  "serviceArea": {
+    "zipCodes": ["92101", "92102", "92103"],
+    "deliveryRadius": "15 miles"
+  },
+  "summary": "Great! Store #257 delivers to 92101 for $5.99"
+}
+```
+
+### Response (Store Validation Mode - Cannot Deliver)
+```json
+{
+  "canDeliver": false,
+  "store": {
+    "storeNumber": "257",
+    "name": "Edible Arrangements #257",
+    "address": "4340 Genesee Ave, San Diego, CA 92117",
+    "phone": "(858) 585-4156"
+  },
+  "message": "Store #257 does not deliver to ZIP code 90210",
+  "suggestion": "This store offers pickup, or we can find a store that delivers to your area",
+  "nearestAlternative": {
+    "storeNumber": "312",
+    "name": "Edible Arrangements #312",
+    "address": "123 Main St, Los Angeles, CA 90210",
+    "phone": "(323) 555-0123",
+    "deliveryInfo": {
+      "fee": "5.99",
+      "minimumOrder": "25.00"
+    }
+  }
 }
 ```
 
@@ -515,6 +571,12 @@ GET /functions/v1/order?customerId=customer-uuid&latest=true
 3. Filter by store inventory using `franchiseeId`
 4. Present options to customer
 
+### Store Validation Flow
+1. Customer provides store number and ZIP code
+2. Call `franchisee-inventory` with both parameters: `/find-nearest?storeNumber=257&zipCode=92101`
+3. Check `canDeliver` field in response
+4. If false, suggest pickup or alternative store from `nearestAlternative`
+
 ### Order Creation Flow
 1. Find customer with `customer-management`
 2. Find store with `franchisee-inventory`
@@ -526,4 +588,5 @@ GET /functions/v1/order?customerId=customer-uuid&latest=true
 2. Apply changes with `order-items` (PATCH)
 3. Handle cancellation prevention if needed
 4. Confirm new totals with customer
+
 This API provides a complete backend for conversational commerce with built-in intelligence for common customer service scenarios. 
