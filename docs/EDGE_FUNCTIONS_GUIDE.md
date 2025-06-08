@@ -8,9 +8,9 @@ Complete API documentation for the Edible Arrangements Voiceflow integration bac
 |---|---|---|---|
 | `product-search` | v14 | AI-powered product discovery | 30/min |
 | `cart-manager` | v1 | Real-time cart operations | 50/min |
-| `customer-management` | v4 | Customer account operations | 20/min |
+| `customer-management` | v7 | Enhanced customer profile management | 20/min |
 | `franchisee-inventory` | v8 | Store location & inventory | 15/min |
-| `order` | v16 | Complete order management | 20/min |
+| `order` | v23 | Voice-friendly order creation with fixed numbering | 20/min |
 | `order-items` | v9 | Order modification & items | 15/min |
 | `user-profile` | v1 | User context for chatbot | 40/min |
 | `generate-embedding` | v5 | AI embedding generation | 10/min |
@@ -74,126 +74,242 @@ Complete API documentation for the Edible Arrangements Voiceflow integration bac
 
 ---
 
-## Cart Management API
+## Cart Management API ⭐ ENHANCED
 
 **Endpoint**: `POST /functions/v1/cart-manager`
 
-### Real-time Cart Validation and Enrichment
-- Validates cart items against the database for price and availability.
-- Enriches cart with up-to-date product details and images.
-- Calculates subtotal, taxes, and shipping costs.
+### Voice Bot Integration & Real-time Cart Management
+- **⭐ Voice-Friendly Identifiers**: Supports 4-digit product IDs (e.g., "3075") and option names (e.g., "Large", "Small")
+- **⭐ Backward Compatibility**: Maintains UUID support for web applications
+- Validates cart items against the database for price and availability
+- Enriches cart with up-to-date product details and images
+- Calculates subtotal, taxes, and shipping costs
+- Action-based API for chatbot workflows
 
-### Request (`validate` action)
+### Actions
+
+#### `add` - Add Product to Cart ⭐ ENHANCED
 ```json
 {
-  "action": "validate",
-  "cartItems": [
-    {
-      "productId": "prod-uuid-123",
-      "optionId": "opt-uuid-456",
-      "quantity": 2
-    },
-    {
-      "productId": "prod-uuid-789",
-      "quantity": 1
-    }
-  ]
+  "action": "add",
+  "productId": "3075",               // ⭐ NEW: 4-digit ID OR UUID
+  "optionName": "Large",             // ⭐ NEW: Human-readable option name
+  "quantity": 2
 }
 ```
 
-### Response
+**Alternative (Legacy UUID format):**
 ```json
 {
-  "isValid": true,
-  "validatedCart": {
+  "action": "add",
+  "productId": "prod-uuid-123",      // Traditional UUID
+  "optionId": "opt-uuid-456",        // Traditional option UUID
+  "quantity": 2
+}
+```
+
+#### `get` - Get Product Details
+```json
+{
+  "action": "get",
+  "productId": "3075"                
+}
+```
+
+#### `validate` - Validate Cart Contents
+```json
+{
+  "action": "validate",
+  "cartData": {
     "items": [
       {
-        "productId": "prod-uuid-123",
-        "optionId": "opt-uuid-456",
-        "quantity": 2,
-        "name": "Chocolate Dipped Strawberries",
-        "optionName": "Large Box",
-        "unitPrice": "64.99",
-        "totalPrice": "129.98",
-        "imageUrl": "https://..."
-      },
+        "product": { "id": "prod-uuid-123", "name": "Strawberries" },
+        "option": { "id": "opt-uuid-456", "name": "Large" },
+        "quantity": 2
+      }
+    ]
+  }
+}
+```
+
+#### `summary` - Get Cart Summary ⭐ ENHANCED
+```json
+{
+  "action": "summary",
+  "cartData": {
+    "items": [
       {
-        "productId": "prod-uuid-789",
-        "quantity": 1,
-        "name": "Fruit Bouquet",
-        "unitPrice": "45.00",
-        "totalPrice": "45.00",
-        "imageUrl": "https://..."
+        "product": { 
+          "id": "prod-uuid-123", 
+          "base_price": "29.99",
+          "product_identifier": "3075"  // ⭐ Include 4-digit ID
+        },
+        "option": { 
+          "id": "opt-uuid-456", 
+          "price": "49.99",
+          "option_name": "Large"         // ⭐ Voice-friendly name
+        },
+        "quantity": 2
+      }
+    ]
+  }
+}
+```
+
+### Voice-Friendly Add Response ⭐ NEW
+```json
+{
+  "success": true,
+  "action": "add_to_cart",
+  "message": "Added 2 Chocolate Dipped Strawberries (Large) to cart",
+  "data": {
+    "product": {
+      "id": "prod-uuid-123",
+      "name": "Chocolate Dipped Strawberries",
+      "base_price": "29.99",
+      "productId": "3075"              // ⭐ Include 4-digit ID for voice bots
+    },
+    "option": {
+      "id": "opt-uuid-456",
+      "option_name": "Large",
+      "price": "49.99",
+      "displayName": "Large"           // ⭐ Voice-friendly display name
+    },
+    "quantity": 2,
+    "clientAction": {
+      "type": "ADD_TO_CART",
+      "payload": { "product": "...", "option": "...", "quantity": 2 }
+    }
+  }
+}
+```
+
+### Voice-Friendly Summary Response ⭐ NEW
+```json
+{
+  "success": true,
+  "summary": {
+    "itemCount": 3,
+    "subtotal": 99.97,
+    "tax": 8.25,
+    "shipping": 0,
+    "total": 108.22,
+    "freeShippingEligible": true,
+    "items": [
+      {
+        "name": "Chocolate Dipped Strawberries",
+        "productId": "3075",           // ⭐ 4-digit ID for voice bots
+        "option": "Large",             // ⭐ Human-readable option name
+        "quantity": 2,
+        "price": 49.99,
+        "total": 99.98
       }
     ],
-    "summary": {
-      "itemCount": 3,
-      "subtotal": "174.98",
-      "tax": "14.44",
-      "shipping": "0.00",
-      "total": "189.42",
-      "freeShippingEligible": true
-    }
-  },
-  "warnings": [
-    "Item 'Fruit Bouquet' is low in stock at your selected store."
-  ]
+    "message": "You have 1 different item in your cart. Total: $108.22"
+  }
+}
+```
+
+### Error Handling for Voice Bots ⭐ NEW
+```json
+{
+  "success": false,
+  "message": "Option \"Extra Large\" not found for product 3075",
+  "availableOptions": ["Small", "Medium", "Large"],
+  "hint": "Available options: Small, Medium, Large"
 }
 ```
 
 ---
 
-## Customer Management API
+## Customer Management API ⭐ ENHANCED
 
 **Endpoint**: `POST /functions/v1/customer-management`
 
-### Unified Account System
+### Unified Account System & Enhanced Profiles
 - Multi-source account tracking (chatbot, web, phone)
 - Automatic duplicate detection and prevention
+- **⭐ Enhanced Profile Fields**: Comprehensive customer preferences and details
+- **⭐ Fixed Email Update Logic**: Properly updates temporary emails to real ones
+- **⭐ Improved Preferences Handling**: Better tracking of profile updates
 - Account merging for existing customers
 
-### Request
+### Request ⭐ ENHANCED
 ```json
 {
   "phone": "+1234567890",               // Primary identifier for voice
-  "email": "customer@email.com",        // Primary identifier for web
+  "email": "customer@email.com",        // Primary identifier for web (updates temp emails)
   "authUserId": "auth-uuid",            // Web app authentication
   "firstName": "John",
   "lastName": "Smith",
   "allergies": ["nuts", "dairy"],       // For safety warnings
-  "dietary_restrictions": ["vegetarian"],
-  "source": "chatbot"                   // chatbot, webapp, phone
+  "dietaryRestrictions": ["vegetarian"], // ⭐ NEW: Enhanced dietary tracking
+  "source": "chatbot",                  // chatbot, webapp, phone
+  
+  // ⭐ NEW: Enhanced Profile Fields
+  "preferredContactMethod": "phone",    // phone, email, text
+  "preferredDeliveryTime": "afternoon", // morning, afternoon, evening
+  "birthday": "1985-06-15",            // YYYY-MM-DD format
+  "anniversary": "2010-08-20",         // YYYY-MM-DD format  
+  "occupation": "teacher",
+  "householdSize": 4,
+  "specialOccasions": ["birthdays", "holidays"],
+  
+  // ⭐ NEW: Communication Preferences
+  "orderReminders": true,              // Order status notifications
+  "promotionalOffers": false,          // Marketing communications
+  "holidaySpecials": true              // Holiday promotion alerts
 }
 ```
 
-### Response
+### Response ⭐ ENHANCED
 ```json
 {
   "customer": {
     "id": "customer-uuid",
     "firstName": "John",
     "lastName": "Smith",
+    "name": "John Smith",               // ⭐ Full name convenience field
     "phone": "+1234567890",
-    "email": "john@email.com",
+    "email": "john@email.com",          // ⭐ Properly updated from temp emails
     "allergies": ["nuts"],
+    "dietaryRestrictions": ["vegetarian"], // ⭐ Enhanced dietary info
     "preferences": {
-      "accountSources": ["chatbot", "webapp"]
+      "accountSources": ["chatbot", "webapp"],
+      "preferredContactMethod": "phone",  // ⭐ NEW: Contact preferences
+      "preferredDeliveryTime": "afternoon",
+      "birthday": "1985-06-15",
+      "anniversary": "2010-08-20",
+      "occupation": "teacher",
+      "householdSize": 4,
+      "communicationPreferences": {      // ⭐ NEW: Communication settings
+        "orderReminders": true,
+        "promotionalOffers": false,
+        "holidaySpecials": true
+      }
     },
     "isNewAccount": false,
+    "accountSources": ["chatbot", "webapp"], // ⭐ Quick access to sources
     "_internalId": "uuid"
   },
   "orderHistory": [
     {
-      "orderNumber": "W25710000001-1",
+      "orderNumber": "W25700000001-1",   // ⭐ Fixed order number format
       "date": "2025-01-15",
       "total": "54.11",
       "status": "delivered",
       "itemsSummary": "Chocolate Strawberries, Large"
     }
   ],
-  "summary": "Welcome back John! You have 2 previous orders."
+  "summary": "Welcome back John! I see you have 2 previous orders. What can I help you with today?"
 }
 ```
+
+### Key Bug Fixes ⭐ NEW
+- **Email Update Logic**: Fixed contradictory logic that prevented updating temporary emails
+- **Preferences Handling**: Improved update detection for preference changes
+- **Source Tracking**: Better handling of multi-source account updates
+- **Profile Completeness**: Enhanced tracking of profile field updates
 
 ---
 
@@ -307,28 +423,68 @@ GET /franchisee-inventory/find-nearest?storeNumber=257&zipCode=92101
 
 ---
 
-## Order Management API
+## Order Management API ⭐ ENHANCED
 
 **Endpoint**: `/functions/v1/order`  
 **Methods**: `GET`, `POST`, `PATCH`
 
-### Create Order - POST
+### Voice Bot Integration & Direct Order Creation
+- **⭐ Voice-Friendly Identifiers**: Supports customer phone numbers and store numbers
+- **⭐ Automatic Customer Creation**: Creates customer records for new phone numbers
+- **⭐ Fixed Voice-Friendly Resolution**: Properly resolves option names to UUIDs
+- **⭐ String-to-Number Conversion**: Handles both string and numeric store/product IDs
+- **⭐ Backward Compatibility**: Maintains UUID support for web applications
+- **⭐ Real-time Validation**: Validates products, options, and store availability
+- **⭐ Fixed Order Numbering**: Store-specific sequence with proper increment logic
+- **⭐ Service Role Key Required**: Uses Supabase service role key for full access
+- Direct order creation without cart for voice workflows
+
+### Create Order - POST ⭐ ENHANCED
+
+#### Voice-Friendly Format (Recommended for Chatbots)
 ```json
 {
-  "customerId": "customer-uuid",
-  "franchiseeId": "store-uuid",
-  "fulfillmentType": "delivery",          // delivery or pickup
+  "customerPhone": "+14155551234",         // ⭐ NEW: E164 phone number
+  "storeNumber": 101,                      // ⭐ NEW: Store number (voice-friendly)
   "items": [
     {
-      "productId": "3075",
-      "optionName": "Large",               // Human-readable option
+      "productId": "3075",                 // ⭐ 4-digit ID or UUID
+      "productOptionId": "Large",          // ⭐ Option name or UUID
       "quantity": 1,
       "addons": [
-        {"addonName": "Greeting Card", "quantity": 1}
+        {"addonId": "extra-chocolate", "quantity": 1}  // ⭐ Addon name or UUID
       ]
     }
   ],
   "deliveryAddress": {                     // Required for delivery orders
+    "street": "123 Main St",               // ⭐ Simplified field names
+    "city": "Boston",
+    "state": "MA",
+    "zipCode": "02101",
+    "recipientName": "Jane Smith",
+    "recipientPhone": "+19875551234",
+    "specialInstructions": "Leave at door"
+  },
+  "scheduledDate": "2025-01-20",          // YYYY-MM-DD format
+  "scheduledTimeSlot": "2:00 PM - 4:00 PM", // Time range for delivery
+  "giftMessage": "Happy Birthday!",        // ⭐ NEW: Gift message support
+  "specialInstructions": "Include gift wrapping"
+}
+```
+
+#### Legacy UUID Format (Web Applications)
+```json
+{
+  "customerId": "customer-uuid",
+  "franchiseeId": "store-uuid",
+  "items": [
+    {
+      "productId": "prod-uuid-123",
+      "productOptionId": "opt-uuid-456",
+      "quantity": 1
+    }
+  ],
+  "deliveryAddress": {
     "recipientName": "Jane Smith",
     "recipientPhone": "+1987654321",
     "streetAddress": "123 Main St",
@@ -337,30 +493,56 @@ GET /franchisee-inventory/find-nearest?storeNumber=257&zipCode=92101
     "zipCode": "02101",
     "deliveryInstructions": "Leave at door"
   },
-  "scheduledDate": "2025-01-20",          // Optional: future delivery
-  "scheduledTimeSlot": "2:00 PM - 4:00 PM", // Optional: time preference
-  "specialInstructions": "Happy Birthday message"
+  "scheduledDate": "2025-01-20",
+  "scheduledTimeSlot": "2:00 PM - 4:00 PM"
 }
 ```
 
-### Response
+### Fulfillment Types ⭐ ENHANCED
+
+#### Pickup Orders (No deliveryAddress)
 ```json
 {
+  "customerPhone": "+14155551234",
+  "storeNumber": 101,
+  "items": [
+    {
+      "productId": "3075",
+      "quantity": 1
+    }
+  ],
+  "scheduledDate": "2025-01-20",
+  "scheduledTimeSlot": "2:00 PM"              // ⭐ Specific time for pickup
+}
+```
+
+#### Delivery Orders (Include deliveryAddress)
+- Automatically detected when `deliveryAddress` is provided
+- Time slots should be ranges (e.g., "2:00 PM - 4:00 PM")
+- All address fields except specialInstructions are required
+
+### Response ⭐ ENHANCED
+```json
+{
+  "success": true,
   "order": {
-    "orderNumber": "W25710000001-1",
-    "customerId": "customer-uuid",
+    "orderNumber": "W10100000001-1",         // ⭐ Fixed store-specific format (store 101)
+    "customerId": "customer-uuid",           // ⭐ Resolved from phone
+    "customerPhone": "+14155551234",         // ⭐ Voice-friendly reference
+    "storeNumber": 101,                      // ⭐ Voice-friendly store ID
     "status": "pending",
-    "fulfillmentType": "delivery",
+    "fulfillmentType": "delivery",           // ⭐ Auto-detected
     "items": [
       {
         "productName": "Chocolate Dipped Strawberries",
+        "productId": "3075",                 // ⭐ Include 4-digit ID
         "optionName": "Large",
         "quantity": 1,
         "unitPrice": "64.99",
         "totalPrice": "64.99",
         "addons": [
           {
-            "name": "Greeting Card",
+            "name": "Extra Chocolate",
             "quantity": 1,
             "unitPrice": "4.99"
           }
@@ -377,17 +559,72 @@ GET /franchisee-inventory/find-nearest?storeNumber=257&zipCode=92101
       "recipientName": "Jane Smith",
       "scheduledDate": "2025-01-20",
       "timeSlot": "2:00 PM - 4:00 PM"
-    }
+    },
+    "giftMessage": "Happy Birthday!",        // ⭐ NEW: Gift message
+    "specialInstructions": "Include gift wrapping"
   },
-  "summary": "Order W25710000001-1 created successfully for $75.75"
+  "summary": "Order W10100000001-1 created successfully for $75.75. Delivery scheduled for January 20th between 2:00 PM - 4:00 PM."
 }
 ```
 
-### Retrieve Order - GET
+### Voice-Friendly Error Handling ⭐ NEW
+
+#### Invalid Product Error
+```json
+{
+  "error": "Product 3999 not found or inactive",
+  "hint": "Use 4-digit product ID (e.g., '3075') or valid product UUID",
+  "availableProducts": ["3075", "3076", "3080"],
+  "suggestion": "Try product 3075 for Chocolate Dipped Strawberries"
+}
 ```
-GET /functions/v1/order?orderNumber=W25710000001-1
+
+#### Invalid Customer/Store Error
+```json
+{
+  "error": "Customer not found for phone +14155551234",
+  "hint": "New customers will be created automatically. Check phone format (E164)",
+  "example": {
+    "customerPhone": "+14155551234",
+    "storeNumber": 101
+  }
+}
+```
+
+#### Invalid Option Error
+```json
+{
+  "error": "Option 'Extra Large' not found for product 3075",
+  "availableOptions": ["Small", "Medium", "Large"],
+  "suggestion": "Try 'Large' for this product"
+}
+```
+
+### Retrieve Order - GET ⭐ ENHANCED
+```
+GET /functions/v1/order?orderNumber=W10100000001-1
 GET /functions/v1/order?customerId=customer-uuid&latest=true
+GET /functions/v1/order?customerPhone=+14155551234&latest=true  // ⭐ NEW: Phone lookup
 ```
+
+### Order Number Format ⭐ FIXED
+- **Format**: `W[store_number][8-digit-sequence]-1`
+- **Store 257**: `W25700000001-1`, `W25700000002-1`, `W25700000003-1`
+- **Store 101**: `W10100000001-1`, `W10100000002-1`, `W10100000003-1`
+- **⭐ Fixed**: Sequence now increments properly within each store
+- **⭐ Fixed**: No longer concatenates store number with sequence incorrectly
+
+### Authentication Requirements ⭐ IMPORTANT
+- **Service Role Key Required**: Order endpoint requires Supabase service role key
+- **Not Anonymous**: Cannot use anonymous/anon key for order creation
+- **Postman Testing**: Use `Authorization: Bearer YOUR_SERVICE_ROLE_KEY`
+
+### Key Bug Fixes ⭐ NEW
+- **UUID Variable Resolution**: Fixed using `resolvedCustomerId`/`resolvedFranchiseeId` instead of input variables
+- **Voice Option Resolution**: Fixed proper resolution of option names to UUIDs
+- **String Conversion**: Added robust string-to-number conversion for all identifiers
+- **Schema Compliance**: Removed non-existent database fields causing insertion errors
+- **Order Numbering**: Fixed regex parsing for proper sequence increment logic
 
 ---
 
@@ -404,7 +641,7 @@ GET /functions/v1/order?customerId=customer-uuid&latest=true
 ### Request
 ```json
 {
-  "orderNumber": "W25710000001-1",
+  "orderNumber": "W25700000001-1",      // ⭐ Fixed order number format
   "items": [
     {
       "action": "add",

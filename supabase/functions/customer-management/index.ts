@@ -182,20 +182,33 @@ async function findAllMatchingAccounts(supabase, requestData) {
   return accounts;
 }
 async function createNewAccount(supabase, requestData) {
-  // Create new customer with source tracking
+  // Create new customer with enhanced profile tracking
   const newCustomer = {
     email: requestData.email || `chatbot_${Date.now()}@temp.local`,
     phone: requestData.phone || null,
     first_name: requestData.firstName || null,
     last_name: requestData.lastName || null,
     allergies: requestData.allergies || [],
-    dietary_restrictions: [],
+    dietary_restrictions: requestData.dietaryRestrictions || [],
     preferences: {
       account_sources: [
         requestData.source
       ],
       created_via: requestData.source,
-      last_updated_via: requestData.source
+      last_updated_via: requestData.source,
+      // Enhanced profile information
+      preferred_contact_method: requestData.preferredContactMethod || 'phone',
+      preferred_delivery_time: requestData.preferredDeliveryTime || null,
+      birthday: requestData.birthday || null,
+      anniversary: requestData.anniversary || null,
+      occupation: requestData.occupation || null,
+      household_size: requestData.householdSize || null,
+      special_occasions: requestData.specialOccasions || [],
+      communication_preferences: {
+        order_reminders: requestData.orderReminders !== false,
+        promotional_offers: requestData.promotionalOffers !== false,
+        holiday_specials: requestData.holidaySpecials !== false
+      }
     },
     auth_user_id: requestData.authUserId || null
   };
@@ -243,9 +256,9 @@ async function updateExistingAccount(supabase, existingAccount, requestData) {
     updatedData.phone = requestData.phone;
     hasUpdates = true;
   }
-  if (requestData.email && !existingAccount.email.includes('@temp.local')) {
-    // Only update if current email is temporary
-    if (existingAccount.email.includes('@temp.local')) {
+  if (requestData.email && requestData.email.trim() !== '') {
+    // Update email if current email is temporary OR if no email exists
+    if (!existingAccount.email || existingAccount.email.includes('@temp.local')) {
       updatedData.email = requestData.email;
       hasUpdates = true;
     }
@@ -258,25 +271,77 @@ async function updateExistingAccount(supabase, existingAccount, requestData) {
     updatedData.last_name = requestData.lastName;
     hasUpdates = true;
   }
-  // Update source tracking
-  const currentSources = existingAccount.preferences?.account_sources || [];
-  if (!currentSources.includes(requestData.source)) {
-    updatedData.preferences = {
-      ...existingAccount.preferences,
-      account_sources: [
-        ...currentSources,
-        requestData.source
-      ],
-      last_updated_via: requestData.source
-    };
+  
+  // Update enhanced profile fields (only if not already set)
+  const currentPrefs = existingAccount.preferences || {};
+  const updatedPrefs = { ...currentPrefs };
+  
+  if (requestData.dietaryRestrictions && requestData.dietaryRestrictions.length > 0 && (!existingAccount.dietary_restrictions || existingAccount.dietary_restrictions.length === 0)) {
+    updatedData.dietary_restrictions = requestData.dietaryRestrictions;
     hasUpdates = true;
+  }
+  
+  if (requestData.allergies && requestData.allergies.length > 0 && (!existingAccount.allergies || existingAccount.allergies.length === 0)) {
+    updatedData.allergies = requestData.allergies;
+    hasUpdates = true;
+  }
+  
+  // Update preferences with new profile information
+  if (requestData.preferredContactMethod && !currentPrefs.preferred_contact_method) {
+    updatedPrefs.preferred_contact_method = requestData.preferredContactMethod;
+    hasUpdates = true;
+  }
+  
+  if (requestData.preferredDeliveryTime && !currentPrefs.preferred_delivery_time) {
+    updatedPrefs.preferred_delivery_time = requestData.preferredDeliveryTime;
+    hasUpdates = true;
+  }
+  
+  if (requestData.birthday && !currentPrefs.birthday) {
+    updatedPrefs.birthday = requestData.birthday;
+    hasUpdates = true;
+  }
+  
+  if (requestData.anniversary && !currentPrefs.anniversary) {
+    updatedPrefs.anniversary = requestData.anniversary;
+    hasUpdates = true;
+  }
+  
+  if (requestData.occupation && !currentPrefs.occupation) {
+    updatedPrefs.occupation = requestData.occupation;
+    hasUpdates = true;
+  }
+  
+  if (requestData.householdSize && !currentPrefs.household_size) {
+    updatedPrefs.household_size = requestData.householdSize;
+    hasUpdates = true;
+  }
+  
+  // Update source tracking
+  const currentSources = currentPrefs.account_sources || [];
+  let prefsUpdated = false;
+  if (!currentSources.includes(requestData.source)) {
+    updatedPrefs.account_sources = [...currentSources, requestData.source];
+    updatedPrefs.last_updated_via = requestData.source;
+    prefsUpdated = true;
+    hasUpdates = true;
+  }
+  
+  // Update preferences if anything changed
+  if (prefsUpdated || Object.keys(updatedPrefs).length !== Object.keys(currentPrefs).length) {
+    updatedData.preferences = updatedPrefs;
   }
   // Apply updates if any
   if (hasUpdates) {
+    console.log('Updating customer with data:', JSON.stringify(updatedData, null, 2));
     const { error: updateError } = await supabase.from('customers').update(updatedData).eq('id', existingAccount.id);
     if (updateError) {
       console.error('Customer update error:', updateError);
+    } else {
+      console.log('Customer update successful');
     }
+  } else {
+    console.log('No updates needed for customer:', existingAccount.id);
   }
   // Get order history
   const { data: orders } = await supabase.from('orders').select('*').eq('customer_id', existingAccount.id).order('created_at', {

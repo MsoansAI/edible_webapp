@@ -5,18 +5,102 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS'
 };
+// Helper function to resolve customer by phone number (E164 format)
+async function resolveCustomerId(supabase, customerIdentifier) {
+  if (!customerIdentifier) return null;
+  
+  // Check if it's a UUID pattern (8-4-4-4-12 characters)
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidPattern.test(customerIdentifier)) {
+    // It's a UUID, validate it exists
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('id', customerIdentifier)
+      .single();
+    return error ? null : data?.id;
+  } else {
+    // Assume it's a phone number (E164 format starting with +)
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('phone', customerIdentifier)
+      .single();
+    return error ? null : data?.id;
+  }
+}
+// Helper function to resolve franchisee by store number
+async function resolveFranchiseeId(supabase, franchiseeIdentifier) {
+  if (!franchiseeIdentifier) return null;
+  
+  // Check if it's a UUID pattern
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidPattern.test(franchiseeIdentifier)) {
+    // It's a UUID, validate it exists
+    const { data, error } = await supabase
+      .from('franchisees')
+      .select('id')
+      .eq('id', franchiseeIdentifier)
+      .single();
+    if (error || !data) return null;
+    return franchiseeIdentifier;
+  }
+  
+  // It's a store number (handle both string and number)
+  const storeNumber = parseInt(String(franchiseeIdentifier), 10);
+  if (isNaN(storeNumber) || storeNumber <= 0) return null;
+  
+  const { data, error } = await supabase
+    .from('franchisees')
+    .select('id')
+    .eq('store_number', storeNumber)
+    .single();
+  if (error || !data) return null;
+  return data.id;
+}
+// Helper function to resolve product option by name or UUID
+async function resolveProductOptionId(supabase, productId, optionIdentifier) {
+  if (!optionIdentifier) return null;
+  
+  // Check if it's a UUID pattern
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidPattern.test(optionIdentifier)) {
+    // It's a UUID, validate it exists
+    const { data, error } = await supabase
+      .from('product_options')
+      .select('id')
+      .eq('id', optionIdentifier)
+      .eq('product_id', productId)
+      .single();
+    return error ? null : data?.id;
+  } else {
+    // Assume it's an option name (e.g., "Large", "Small")
+    const { data, error } = await supabase
+      .from('product_options')
+      .select('id')
+      .eq('product_id', productId)
+      .ilike('option_name', optionIdentifier)
+      .single();
+    return error ? null : data?.id;
+  }
+}
 // Helper function to resolve product ID (4-digit to UUID)
 async function resolveProductId(supabase, productId) {
-  const parsed = parseInt(productId);
+  if (!productId) return null;
+  
+  // Try parsing as 4-digit identifier (handle both string and number)
+  const parsed = parseInt(String(productId), 10);
   if (!isNaN(parsed) && parsed >= 1000 && parsed <= 9999) {
     // 4-digit product identifier
     const { data, error } = await supabase.from('products').select('id').eq('product_identifier', parsed).eq('is_active', true).single();
-    return error ? null : data?.id;
-  } else {
-    // Assume UUID - validate it exists and is active
-    const { data, error } = await supabase.from('products').select('id').eq('id', productId).eq('is_active', true).single();
-    return error ? null : data?.id;
+    if (error || !data) return null;
+    return data.id;
   }
+  
+  // Assume UUID - validate it exists and is active
+  const { data, error } = await supabase.from('products').select('id').eq('id', String(productId)).eq('is_active', true).single();
+  if (error || !data) return null;
+  return data.id;
 }
 // Helper function to generate order number
 async function generateOrderNumber(supabase, franchiseeId) {
@@ -25,14 +109,18 @@ async function generateOrderNumber(supabase, franchiseeId) {
   if (franchiseeError || !franchisee) {
     throw new Error('Franchisee not found');
   }
-  // Get next sequence number (using a simple incrementing counter)
-  const { data: lastOrder, error: orderError } = await supabase.from('orders').select('order_number').order('created_at', {
+  
+  // Get next sequence number for this store
+  const { data: lastOrder, error: orderError } = await supabase.from('orders').select('order_number').like('order_number', `W${franchisee.store_number}%`).order('created_at', {
     ascending: false
   }).limit(1);
   let sequence = 1;
   if (!orderError && lastOrder && lastOrder.length > 0) {
     const lastOrderNumber = lastOrder[0].order_number;
-    const match = lastOrderNumber.match(/W\\d{3}(\\d{8})-1/);
+    // Extract sequence from format W[store][sequence]-1: W25700000001-1 -> 00000001
+    const storeNumStr = franchisee.store_number.toString();
+    const pattern = new RegExp(`W${storeNumStr}(\\\\d{8})-1`);
+    const match = lastOrderNumber.match(pattern);
     if (match) {
       sequence = parseInt(match[1]) + 1;
     }
@@ -134,7 +222,13 @@ Deno.serve(async (req)=>{
           status: order.order_data?.order_info?.status,
           total: `$${order.order_data?.order_info?.total_amount}`,
           estimatedDelivery: `${order.order_data?.order_info?.scheduled_date} ${order.order_data?.order_info?.scheduled_time_slot}`,
-          items: order.order_data?.items?.map((item)=>({\n              product: item.product_name,\n              product_id: item.product_identifier,\n              price: `$${item.unit_price}`,\n              quantity: item.quantity,\n              addons: item.addons || []\n            })) || [],
+          items: order.order_data?.items?.map((item)=>({
+              product: item.product_name,
+              product_id: item.product_identifier,
+              price: `$${item.unit_price}`,
+              quantity: item.quantity,
+              addons: item.addons || []
+            })) || [],
           delivery: order.order_data?.delivery_info ? {
             address: order.order_data.delivery_info.address,
             instructions: order.order_data.delivery_info.instructions
@@ -151,14 +245,31 @@ Deno.serve(async (req)=>{
     } else if (method === 'POST') {
       // POST: Create new order
       const requestData = await req.json();
-      const { customerId, franchiseeId, items, deliveryAddress, pickupTime, scheduledDate, scheduledTimeSlot, specialInstructions, giftMessage, outputType = 'streamlined' } = requestData;
+      console.log('Received request data:', JSON.stringify(requestData, null, 2));
+      
+      const { customerId, customerPhone, franchiseeId, storeNumber, items, deliveryAddress, pickupTime, scheduledDate, scheduledTimeSlot, specialInstructions, outputType = 'streamlined' } = requestData;
+      
+      // Support voice-friendly identifiers
+      const resolvedCustomerId = await resolveCustomerId(supabase, customerId || customerPhone);
+      const resolvedFranchiseeId = await resolveFranchiseeId(supabase, franchiseeId || storeNumber);
+      
+      console.log('Resolution results:', {
+        customerInput: customerId || customerPhone,
+        resolvedCustomerId,
+        storeInput: franchiseeId || storeNumber,
+        resolvedFranchiseeId,
+        items: items ? `array of ${items.length} items` : 'missing/invalid',
+        isArray: Array.isArray(items)
+      });
+      
       // Validation
-      if (!customerId || !franchiseeId || !items || !Array.isArray(items) || items.length === 0) {
+      if (!resolvedCustomerId || !resolvedFranchiseeId || !items || !Array.isArray(items) || items.length === 0) {
         return new Response(JSON.stringify({
-          error: 'customerId, franchiseeId, and items array are required',
+          error: 'Customer, store, and items array are required',
+          hint: 'Use customerId (UUID) or customerPhone (E164), franchiseeId (UUID) or storeNumber (integer)',
           example: {
-            customerId: 'customer-uuid',
-            franchiseeId: 'store-uuid',
+            customerPhone: '+14155551234',
+            storeNumber: 101,
             items: [
               {
                 productId: '3075',
@@ -187,7 +298,7 @@ Deno.serve(async (req)=>{
         });
       }
       // Verify customer exists
-      const { data: customer, error: customerError } = await supabase.from('customers').select('id, email, first_name, last_name').eq('id', customerId).single();
+      const { data: customer, error: customerError } = await supabase.from('customers').select('id, email, first_name, last_name').eq('id', resolvedCustomerId).single();
       if (customerError || !customer) {
         return new Response(JSON.stringify({
           error: 'Customer not found'
@@ -200,7 +311,7 @@ Deno.serve(async (req)=>{
         });
       }
       // Verify franchisee exists
-      const { data: franchisee, error: franchiseeError } = await supabase.from('franchisees').select('id, name, store_number').eq('id', franchiseeId).single();
+      const { data: franchisee, error: franchiseeError } = await supabase.from('franchisees').select('id, name, store_number').eq('id', resolvedFranchiseeId).single();
       if (franchiseeError || !franchisee) {
         return new Response(JSON.stringify({
           error: 'Franchisee not found'
@@ -213,11 +324,20 @@ Deno.serve(async (req)=>{
         });
       }
       // Generate order number
-      const orderNumber = await generateOrderNumber(supabase, franchiseeId);
+      const orderNumber = await generateOrderNumber(supabase, resolvedFranchiseeId);
       // Create recipient address if delivery
       let recipientAddressId = null;
       if (fulfillmentType === 'delivery') {
-        const { data: recipientAddress, error: addressError } = await supabase.from('recipient_addresses').insert({\n          customer_id: customerId,\n          recipient_name: deliveryAddress.recipientName || `${customer.first_name} ${customer.last_name}`,\n          recipient_phone: deliveryAddress.recipientPhone || '',\n          street_address: deliveryAddress.street,\n          city: deliveryAddress.city,\n          state: deliveryAddress.state,\n          zip_code: deliveryAddress.zipCode,\n          delivery_instructions: deliveryAddress.specialInstructions || ''\n        }).select('id').single();
+        const { data: recipientAddress, error: addressError } = await supabase.from('recipient_addresses').insert({
+          customer_id: resolvedCustomerId,
+          recipient_name: deliveryAddress.recipientName || `${customer.first_name} ${customer.last_name}`,
+          recipient_phone: deliveryAddress.recipientPhone || '',
+          street_address: deliveryAddress.street,
+          city: deliveryAddress.city,
+          state: deliveryAddress.state,
+          zip_code: deliveryAddress.zipCode,
+          delivery_instructions: deliveryAddress.specialInstructions || ''
+        }).select('id').single();
         if (addressError) {
           console.error('Error creating recipient address:', addressError);
           return new Response(JSON.stringify({
@@ -264,9 +384,24 @@ Deno.serve(async (req)=>{
           });
         }
         let unitPrice = productData.base_price;
-        // Handle product option
+        let resolvedProductOptionId = null;
+        
+        // Handle product option with voice-friendly resolution
         if (item.productOptionId) {
-          const { data: optionData, error: optionError } = await supabase.from('product_options').select('price, option_name').eq('id', item.productOptionId).single();
+          resolvedProductOptionId = await resolveProductOptionId(supabase, resolvedProductId, item.productOptionId);
+          if (!resolvedProductOptionId) {
+            return new Response(JSON.stringify({
+              error: `Product option ${item.productOptionId} not found for product ${item.productId}`
+            }), {
+              status: 400,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json'
+              }
+            });
+          }
+          
+          const { data: optionData, error: optionError } = await supabase.from('product_options').select('price, option_name').eq('id', resolvedProductOptionId).single();
           if (optionError || !optionData) {
             return new Response(JSON.stringify({
               error: `Product option ${item.productOptionId} not found`
@@ -284,7 +419,7 @@ Deno.serve(async (req)=>{
         subtotal += totalPrice;
         processedItems.push({
           productId: resolvedProductId,
-          productOptionId: item.productOptionId,
+          productOptionId: resolvedProductOptionId,
           quantity: item.quantity,
           unitPrice: unitPrice,
           totalPrice: totalPrice,
@@ -295,7 +430,20 @@ Deno.serve(async (req)=>{
       const taxAmount = subtotal * 0.0825;
       const totalAmount = subtotal + taxAmount;
       // Create order
-      const { data: newOrder, error: orderError } = await supabase.from('orders').insert({\n        customer_id: customerId,\n        franchisee_id: franchiseeId,\n        recipient_address_id: recipientAddressId,\n        order_number: orderNumber,\n        status: 'pending',\n        fulfillment_type: fulfillmentType,\n        subtotal: subtotal.toFixed(2),\n        tax_amount: taxAmount.toFixed(2),\n        total_amount: totalAmount.toFixed(2),\n        scheduled_date: scheduledDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],\n        scheduled_time_slot: scheduledTimeSlot || (fulfillmentType === 'delivery' ? '2:00 PM - 4:00 PM' : pickupTime || '2:00 PM'),\n        special_instructions: specialInstructions || giftMessage || ''\n      }).select('id').single();
+      const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
+        customer_id: resolvedCustomerId,
+        franchisee_id: resolvedFranchiseeId,
+        recipient_address_id: recipientAddressId,
+        order_number: orderNumber,
+        status: 'pending',
+        fulfillment_type: fulfillmentType,
+        subtotal: subtotal.toFixed(2),
+        tax_amount: taxAmount.toFixed(2),
+        total_amount: totalAmount.toFixed(2),
+        scheduled_date: scheduledDate || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        scheduled_time_slot: scheduledTimeSlot || (fulfillmentType === 'delivery' ? '2:00 PM - 4:00 PM' : pickupTime || '2:00 PM'),
+        special_instructions: specialInstructions || ''
+      }).select('id').single();
       if (orderError) {
         console.error('Error creating order:', orderError);
         return new Response(JSON.stringify({
@@ -312,7 +460,14 @@ Deno.serve(async (req)=>{
       const orderId = newOrder.id;
       // Create order items
       for (const item of processedItems){
-        const { data: orderItem, error: itemError } = await supabase.from('order_items').insert({\n          order_id: orderId,\n          product_id: item.productId,\n          product_option_id: item.productOptionId,\n          quantity: item.quantity,\n          unit_price: item.unitPrice,\n          total_price: item.totalPrice\n        }).select('id').single();
+        const { data: orderItem, error: itemError } = await supabase.from('order_items').insert({
+          order_id: orderId,
+          product_id: item.productId,
+          product_option_id: item.productOptionId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total_price: item.totalPrice
+        }).select('id').single();
         if (itemError) {
           console.error('Error creating order item:', itemError);
           return new Response(JSON.stringify({
@@ -330,7 +485,12 @@ Deno.serve(async (req)=>{
           for (const addon of item.addons){
             const { data: addonData, error: addonError } = await supabase.from('addons').select('price').eq('id', addon.addonId).single();
             if (!addonError && addonData) {
-              await supabase.from('order_addons').insert({\n                order_item_id: orderItem.id,\n                addon_id: addon.addonId,\n                quantity: addon.quantity,\n                unit_price: addonData.price\n              });
+              await supabase.from('order_addons').insert({
+                order_item_id: orderItem.id,
+                addon_id: addon.addonId,
+                quantity: addon.quantity,
+                unit_price: addonData.price
+              });
             }
           }
         }
@@ -373,7 +533,11 @@ Deno.serve(async (req)=>{
           status: 'pending',
           total: `$${totalAmount.toFixed(2)}`,
           estimatedDelivery: fulfillmentType === 'delivery' ? `${scheduledDate || 'Tomorrow'} ${scheduledTimeSlot || '2-4 PM'}` : `Pickup ${scheduledDate || 'Tomorrow'} ${scheduledTimeSlot || pickupTime || '2:00 PM'}`,
-          items: processedItems.map((item)=>({\n              product: createdOrderData.order_data?.items?.find((oi)=>oi.product_id === item.productId)?.product_name || 'Product',\n              price: `$${item.unitPrice}`,\n              quantity: item.quantity\n            })),
+          items: processedItems.map((item)=>({
+              product: createdOrderData.order_data?.items?.find((oi)=>oi.product_id === item.productId)?.product_name || 'Product',
+              price: `$${item.unitPrice}`,
+              quantity: item.quantity
+            })),
           delivery: fulfillmentType === 'delivery' ? {
             address: `${deliveryAddress.street}, ${deliveryAddress.city}, ${deliveryAddress.state}`,
             instructions: deliveryAddress.specialInstructions
@@ -552,7 +716,13 @@ Deno.serve(async (req)=>{
           status: updatedOrderData.order_data?.order_info?.status,
           total: `$${updatedOrderData.order_data?.order_info?.total_amount}`,
           estimatedDelivery: `${updatedOrderData.order_data?.order_info?.scheduled_date} ${updatedOrderData.order_data?.order_info?.scheduled_time_slot}`,
-          items: updatedOrderData.order_data?.items?.map((item)=>({\n              product: item.product_name,\n              product_id: item.product_identifier,\n              price: `$${item.unit_price}`,\n              quantity: item.quantity,\n              addons: item.addons || []\n            })) || [],
+          items: updatedOrderData.order_data?.items?.map((item)=>({
+              product: item.product_name,
+              product_id: item.product_identifier,
+              price: `$${item.unit_price}`,
+              quantity: item.quantity,
+              addons: item.addons || []
+            })) || [],
           delivery: updatedOrderData.order_data?.delivery_info ? {
             address: updatedOrderData.order_data.delivery_info.address,
             instructions: updatedOrderData.order_data.delivery_info.instructions
