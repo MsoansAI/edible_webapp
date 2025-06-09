@@ -25,7 +25,7 @@ These are Deno-based TypeScript functions that contain the core business logic. 
 -   **`product-search`**: Handles semantic search queries for products using vector embeddings.
 -   **`customer-management`**: Manages customer data. It can find existing customers (by phone, email, or auth ID) or create new ones, intelligently merging data from different sources.
 -   **`franchisee-inventory`**: Finds the nearest franchisee based on a ZIP code and checks for product availability.
--   **`order`**: Orchestrates the creation and retrieval of entire orders. It handles generating order numbers, calculating totals, and managing fulfillment details. Supports `GET`, `POST`, and `PATCH`.
+-   **`order`**: Orchestrates the creation and retrieval of entire orders. It handles generating order numbers, calculating totals, and managing fulfillment details. **⭐ ENHANCED**: Now supports payment link generation for phone orders. Supports `GET`, `POST`, `PATCH`, and `PUT`.
 -   **`order-items`**: A powerful function for modifying the contents of an existing order. It supports adding, updating, and removing items, with advanced logic for handling product options and preventing accidental order cancellations. Supports `PATCH`.
 -   **`cart-manager`**: Provides a stateful cart API for the frontend, allowing for the creation of carts and the addition/removal of items before an order is formally created.
 -   **`user-profile`**: Handles profile data for authenticated web app users, allowing them to view and update their personal information.

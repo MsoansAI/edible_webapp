@@ -32,8 +32,9 @@ The typical user journey and data flow are as follows:
 6.  **Order Placement & Modification:**
     -   The `order` function is called to create a new order, generating a unique order number and calculating totals.
     -   The `order-items` function is used to add, update, or remove items from an existing order, with built-in logic to handle complex scenarios like partial removals and order cancellations.
+    -   **⭐ NEW: Payment Link Generation** - The `order` function can generate secure payment links (PUT endpoint) for customers to pay online after phone order confirmation.
 7.  **Database Update:** All actions are transactionally recorded in the Supabase PostgreSQL database. Triggers and functions within the database work to denormalize data into "flat" tables (e.g., `chatbot_orders_flat`) for efficient retrieval by the AI agent.
-8.  **Confirmation:** The customer receives a confirmation of their order, and the relevant franchisee is notified.
+8.  **Confirmation & Payment:** The customer receives a confirmation of their order. For phone orders, they can receive a secure payment link to complete payment online. The relevant franchisee is notified upon payment completion.
 
 This architecture creates a robust, scalable, and intelligent system designed to automate and enhance the entire customer lifecycle.
 

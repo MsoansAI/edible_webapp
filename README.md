@@ -8,6 +8,12 @@ This repository contains the frontend web application and backend serverless fun
 
 This project is a functional, full-stack application built to demonstrate a modern, AI-driven ordering system. It includes a Next.js frontend, a complete set of Supabase edge functions for backend logic, and a sophisticated database schema.
 
+**⭐ Recent Updates:**
+- **Payment Link Generation**: NEW PUT endpoint for generating secure payment links for phone orders
+- **Enhanced Phone Lookup**: Improved GET endpoint with customer phone number lookup
+- **CORS Configuration**: Full HTTP method support (GET, POST, PATCH, PUT, OPTIONS)
+- **API Documentation**: Updated with complete endpoint coverage and examples
+
 ## Core Features
 
 -   **AI-Powered Chatbot:** An integrated chatbot (powered by Voiceflow & OpenAI) that can handle customer identification, semantic product search, order placement, and modifications.

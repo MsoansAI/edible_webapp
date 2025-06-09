@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS'
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, OPTIONS'
 };
 // Helper function to resolve customer by phone number (E164 format)
 async function resolveCustomerId(supabase, customerIdentifier) {
@@ -165,13 +165,16 @@ Deno.serve(async (req)=>{
     const method = req.method;
     const url = new URL(req.url);
     if (method === 'GET') {
-      // GET: Retrieve orders
+      // GET: Retrieve orders  
       const customerId = url.searchParams.get('customerId');
+      const customerPhone = url.searchParams.get('customerPhone'); // ⭐ NEW: Phone lookup
       const orderNumber = url.searchParams.get('orderNumber');
+      const latest = url.searchParams.get('latest') === 'true';
       const outputType = url.searchParams.get('outputType') || 'streamlined';
-      if (!customerId && !orderNumber) {
+      
+      if (!customerId && !customerPhone && !orderNumber) {
         return new Response(JSON.stringify({
-          error: 'Either customerId or orderNumber is required'
+          error: 'Either customerId, customerPhone, or orderNumber is required'
         }), {
           status: 400,
           headers: {
@@ -180,12 +183,36 @@ Deno.serve(async (req)=>{
           }
         });
       }
+      
       let query;
-      if (customerId) {
+      let resolvedCustomerId = customerId;
+      
+      // ⭐ NEW: Resolve customer by phone number if provided
+      if (customerPhone && !customerId) {
+        resolvedCustomerId = await resolveCustomerId(supabase, customerPhone);
+        if (!resolvedCustomerId) {
+          return new Response(JSON.stringify({
+            error: 'Customer not found',
+            message: `No customer found with phone number ${customerPhone}`
+          }), {
+            status: 404,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          });
+        }
+      }
+      
+      if (resolvedCustomerId) {
         // Get most recent order for customer by joining with orders table
-        query = supabase.from('chatbot_orders_flat').select('*, orders!inner(customer_id)').eq('orders.customer_id', customerId).order('last_updated', {
+        query = supabase.from('chatbot_orders_flat').select('*, orders!inner(customer_id)').eq('orders.customer_id', resolvedCustomerId).order('last_updated', {
           ascending: false
-        }).limit(1);
+        });
+        
+        if (latest) {
+          query = query.limit(1);
+        }
       } else if (orderNumber) {
         // Search by last 4 digits of order number (more precise pattern)
         query = supabase.from('chatbot_orders_flat').select('*').like('order_data->order_info->>order_number', `%${orderNumber}-%`);
@@ -495,6 +522,18 @@ Deno.serve(async (req)=>{
           }
         }
       }
+
+      // Update customer's last_order_at timestamp
+      const { error: customerUpdateError } = await supabase
+        .from('customers')
+        .update({ last_order_at: new Date().toISOString() })
+        .eq('id', resolvedCustomerId)
+
+      if (customerUpdateError) {
+        // Log this error but don't fail the request, as the order itself was created.
+        console.error(`Failed to update last_order_at for customer ${resolvedCustomerId}:`, customerUpdateError)
+      }
+
       // Wait for triggers to update flat table
       await new Promise((resolve)=>setTimeout(resolve, 200));
       // Fetch the created order
@@ -736,15 +775,127 @@ Deno.serve(async (req)=>{
           'Content-Type': 'application/json'
         }
       });
+    } else if (method === 'PUT') {
+      // PUT: Generate payment link for existing order
+      const requestData = await req.json();
+      const { orderId, orderNumber, expirationHours = 24 } = requestData;
+      
+      if (!orderId && !orderNumber) {
+        return new Response(JSON.stringify({
+          error: 'Either orderId or orderNumber is required'
+        }), {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+      
+      // Find order
+      let orderQuery = supabase.from('orders').select('id, order_number, total_amount, payment_status, status');
+      if (orderId) {
+        orderQuery = orderQuery.eq('id', orderId);
+      } else {
+        orderQuery = orderQuery.eq('order_number', orderNumber);
+      }
+      
+      const { data: order, error: orderError } = await orderQuery.single();
+      
+      if (orderError || !order) {
+        return new Response(JSON.stringify({
+          error: 'Order not found'
+        }), {
+          status: 404,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+      
+      // Check if order is in a valid state for payment
+      if (order.payment_status === 'paid') {
+        return new Response(JSON.stringify({
+          error: 'Order has already been paid'
+        }), {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+      
+      if (order.status === 'cancelled') {
+        return new Response(JSON.stringify({
+          error: 'Cannot generate payment link for cancelled order'
+        }), {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+      
+      // Generate secure payment token
+      const paymentToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + (expirationHours * 60 * 60 * 1000)).toISOString();
+      
+      // Update order with payment token
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          payment_token: paymentToken,
+          payment_link_expires_at: expiresAt,
+          payment_status: 'pending'
+        })
+        .eq('id', order.id);
+      
+      if (updateError) {
+        console.error('Error updating order with payment token:', updateError);
+        return new Response(JSON.stringify({
+          error: 'Failed to generate payment link'
+        }), {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+      
+      // Get base URL from environment or construct from request
+      const baseUrl = Deno.env.get('WEBAPP_BASE_URL') || `${new URL(req.url).protocol}//${new URL(req.url).host}`;
+      const paymentUrl = `${baseUrl}/order/pay/${paymentToken}`;
+      
+      return new Response(JSON.stringify({
+        success: true,
+        paymentUrl,
+        paymentToken,
+        expiresAt,
+        orderNumber: order.order_number,
+        totalAmount: order.total_amount,
+        message: 'Payment link generated successfully',
+        validUntil: new Date(expiresAt).toLocaleString()
+      }), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+      
     } else {
       return new Response(JSON.stringify({
         error: 'Method not allowed',
         supportedMethods: [
           'GET',
           'POST',
-          'PATCH'
+          'PATCH',
+          'PUT'
         ],
-        description: 'Use GET to retrieve orders, POST to create orders, PATCH to update orders.'
+        description: 'Use GET to retrieve orders, POST to create orders, PATCH to update orders, PUT to generate payment links.'
       }), {
         status: 405,
         headers: {

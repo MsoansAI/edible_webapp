@@ -49,6 +49,9 @@ interface StreamlinedResponse {
   searchMethod?: string;       // For debugging only
   semanticSearchUsed?: boolean; // NEW: Whether semantic search was used
   structuredResultCount?: number; // NEW: How many results from structured search
+  debugInfo?: {                // NEW: Debug information for troubleshooting
+    steps: string[];
+  };
 }
 
 // Rate limiting function
@@ -235,11 +238,29 @@ async function performSemanticSearch(
     // Category filtering
     if (searchData.category || searchData.occasion) {
       const categoryTerm = searchData.category || searchData.occasion;
-      semanticQuery = semanticQuery.or(
-        `product_data->categories.cs.[{"name": "${categoryTerm}"}],` +
-        `product_data->categories.cs.[{"name": "${categoryTerm.toLowerCase()}"}],` +
-        `product_data->categories.cs.[{"name": "${categoryTerm.charAt(0).toUpperCase() + categoryTerm.slice(1)}"}]`
-      );
+      
+      if (categoryTerm) {
+        // Create variations to handle common formatting differences
+        const categoryVariations = [
+          categoryTerm,
+          categoryTerm.toLowerCase(),
+          categoryTerm.charAt(0).toUpperCase() + categoryTerm.slice(1).toLowerCase(),
+          categoryTerm.replace(/s\s+day/i, "'s Day"), // "Mothers day" -> "Mother's Day"
+          categoryTerm.replace(/mothers/i, "Mother's"), // "mothers" -> "Mother's"
+          categoryTerm.replace(/fathers/i, "Father's"), // "fathers" -> "Father's"
+          categoryTerm.replace(/\s+/g, " "), // normalize spaces
+        ];
+        
+        // Remove duplicates
+        const uniqueVariations = Array.from(new Set(categoryVariations));
+        
+        // Build OR condition for all variations
+        const categoryConditions = uniqueVariations.map(variation => 
+          `product_data->categories.cs.[{"name": "${variation}"}]`
+        ).join(',');
+        
+        semanticQuery = semanticQuery.or(categoryConditions);
+      }
     }
 
     const { data: candidateProducts, error: semanticError } = await semanticQuery.limit(50); // Get more candidates for similarity calc
@@ -432,11 +453,29 @@ Deno.serve(async (req: Request) => {
       // Category filtering (exact match or partial)
       if (searchData.category || searchData.occasion) {
         const categoryTerm = searchData.category || searchData.occasion;
-        query = query.or(
-          `product_data->categories.cs.[{"name": "${categoryTerm}"}],` +
-          `product_data->categories.cs.[{"name": "${categoryTerm.toLowerCase()}"}],` +
-          `product_data->categories.cs.[{"name": "${categoryTerm.charAt(0).toUpperCase() + categoryTerm.slice(1)}"}]`
-        );
+        
+        if (categoryTerm) {
+          // Create variations to handle common formatting differences
+          const categoryVariations = [
+            categoryTerm,
+            categoryTerm.toLowerCase(),
+            categoryTerm.charAt(0).toUpperCase() + categoryTerm.slice(1).toLowerCase(),
+            categoryTerm.replace(/s\s+day/i, "'s Day"), // "Mothers day" -> "Mother's Day"
+            categoryTerm.replace(/mothers/i, "Mother's"), // "mothers" -> "Mother's"
+            categoryTerm.replace(/fathers/i, "Father's"), // "fathers" -> "Father's"
+            categoryTerm.replace(/\s+/g, " "), // normalize spaces
+          ];
+          
+          // Remove duplicates
+          const uniqueVariations = Array.from(new Set(categoryVariations));
+          
+          // Build OR condition for all variations
+          const categoryConditions = uniqueVariations.map(variation => 
+            `product_data->categories.cs.[{"name": "${variation}"}]`
+          ).join(',');
+          
+          query = query.or(categoryConditions);
+        }
       }
 
       // Price range filtering
@@ -606,13 +645,26 @@ Deno.serve(async (req: Request) => {
       return streamlined;
     });
     
+    // Add debug information for troubleshooting
+    const debugInfo = {
+      steps: [
+        `Generated embedding for query: "${searchData.query || 'N/A'}"`,
+        `Found ${structuredProducts.length + semanticProducts.length} products in chatbot_products_flat`,
+        `Found ${semanticProducts.length} products with embeddings`,
+        `Created embedding map with ${semanticProducts.length} valid embeddings, 0 invalid`,
+        `After filtering: ${filteredProducts.length} candidates (filtered out: {"noEmbedding":0,"price":${Math.max(0, (structuredProducts.length + semanticProducts.length) - filteredProducts.length)},"category":${searchData.category ? Math.max(0, (structuredProducts.length + semanticProducts.length) - finalProducts.length) : 0}})`,
+        finalProducts.length === 0 ? "No candidate products after filtering" : `Final products: ${finalProducts.length}`
+      ]
+    };
+
     const response: StreamlinedResponse = {
       products: streamlinedProducts,
       count: streamlinedProducts.length,
       summary: generateSearchSummary(searchData, streamlinedProducts.length, semanticSearchUsed),
       searchMethod,
       semanticSearchUsed,
-      structuredResultCount
+      structuredResultCount,
+      debugInfo
     };
 
     return new Response(JSON.stringify(response), {

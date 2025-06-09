@@ -426,7 +426,13 @@ GET /franchisee-inventory/find-nearest?storeNumber=257&zipCode=92101
 ## Order Management API ⭐ ENHANCED
 
 **Endpoint**: `/functions/v1/order`  
-**Methods**: `GET`, `POST`, `PATCH`
+**Methods**: `GET`, `POST`, `PATCH`, `PUT`
+
+### Supported Operations
+- **GET**: Retrieve order by number, customer ID, or phone lookup
+- **POST**: Create new orders with voice-friendly or UUID format
+- **PATCH**: Update existing order details (status, customer info, etc.)
+- **PUT**: Generate secure payment links for existing orders
 
 ### Voice Bot Integration & Direct Order Creation
 - **⭐ Voice-Friendly Identifiers**: Supports customer phone numbers and store numbers
@@ -606,6 +612,43 @@ GET /functions/v1/order?orderNumber=W10100000001-1
 GET /functions/v1/order?customerId=customer-uuid&latest=true
 GET /functions/v1/order?customerPhone=+14155551234&latest=true  // ⭐ NEW: Phone lookup
 ```
+
+### Generate Payment Link - PUT ⭐ NEW
+Generate secure payment links for existing orders to enable customers to pay online after phone confirmation.
+
+```
+PUT /functions/v1/order
+```
+
+**Request:**
+```json
+{
+  "orderNumber": "W25700000001-1",      // Required: Existing order number
+  "customerId": "customer-uuid-123",    // Alternative: Use customer ID
+  "expirationHours": 24                 // Optional: Default 24 hours
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "paymentUrl": "https://jfjvqylmjzprnztbfhpa.supabase.co/order/pay/f0f110e2-35fd-4683-a310-54d55ff332e0",
+  "paymentToken": "f0f110e2-35fd-4683-a310-54d55ff332e0",
+  "totalAmount": 48.68,
+  "orderNumber": "W25700000001-1",
+  "expiresAt": "2025-01-16T18:30:00.000Z",
+  "validUntil": "1/16/2025, 6:30:00 PM",
+  "message": "Payment link generated successfully"
+}
+```
+
+**Features:**
+- **Secure Tokens**: Crypto-generated UUID tokens
+- **Expiration Control**: Configurable expiration (default 24 hours)
+- **Single Use**: Tokens invalidated after successful payment
+- **Amount Validation**: Prevents tampering with order totals
+- **Mobile Optimized**: Responsive payment page
 
 ### Order Number Format ⭐ FIXED
 - **Format**: `W[store_number][8-digit-sequence]-1`
