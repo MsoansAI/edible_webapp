@@ -4,7 +4,7 @@ This repository contains the frontend web application and backend serverless fun
 
 ## Project Status
 
-**Status:** `Active Development`
+**Status:** `Active Development MVP`
 
 This project is a functional, full-stack application built to demonstrate a modern, AI-driven ordering system. It includes a Next.js frontend, a complete set of Supabase edge functions for backend logic, and a sophisticated database schema.
 
