@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { FunnelIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline'
+import { FunnelIcon, Squares2X2Icon, ListBulletIcon, ChevronDownIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline'
 import { Product, Category } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 import ProductCard from '@/components/ProductCard'
@@ -17,6 +17,8 @@ function ProductsContent() {
   const [showFilters, setShowFilters] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [sortBy, setSortBy] = useState('featured')
   const searchParams = useSearchParams()
   const { addItem } = useCartStore()
   
@@ -39,8 +41,6 @@ function ProductsContent() {
       // Apply category filter
       const categoryFilter = searchParams.get('category')
       if (categoryFilter) {
-        // This would need a join with product_categories table in a real implementation
-        // For now, we'll filter by product name containing category keywords
         const categoryKeywords = {
           'arrangements': 'arrangement',
           'chocolate': 'chocolate',
@@ -63,27 +63,44 @@ function ProductsContent() {
         query = query.lte('base_price', parseFloat(maxPrice))
       }
 
+      // Apply sorting
+      switch (sortBy) {
+        case 'price-low':
+          query = query.order('base_price', { ascending: true })
+          break
+        case 'price-high':
+          query = query.order('base_price', { ascending: false })
+          break
+        case 'name-asc':
+          query = query.order('name', { ascending: true })
+          break
+        case 'name-desc':
+          query = query.order('name', { ascending: false })
+          break
+        default:
+          query = query.order('name')
+      }
+
       // Apply pagination
       const offset = (currentPage - 1) * PRODUCTS_PER_PAGE
       query = query.range(offset, offset + PRODUCTS_PER_PAGE - 1)
-
-      // Order by name
-      query = query.order('name')
 
       const { data, error, count } = await query
 
       if (error) {
         console.error('Error fetching products:', error)
+        toast.error('Failed to load products')
       } else {
         setProducts(data || [])
         setTotalCount(count || 0)
       }
     } catch (error) {
       console.error('Error fetching products:', error)
+      toast.error('Failed to load products')
     } finally {
       setIsLoading(false)
     }
-  }, [searchParams, currentPage])
+  }, [searchParams, currentPage, sortBy])
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -119,92 +136,175 @@ function ProductsContent() {
     toast.success(`${product.name} added to cart!`)
   }
 
+  const sortOptions = [
+    { value: 'featured', label: 'Featured' },
+    { value: 'price-low', label: 'Price: Low to High' },
+    { value: 'price-high', label: 'Price: High to Low' },
+    { value: 'name-asc', label: 'Name: A to Z' },
+    { value: 'name-desc', label: 'Name: Z to A' },
+  ]
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-neutral-50">
       
-      <div className="container-width section-padding py-8">
-        {/* Page Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+      {/* Header Banner */}
+      <div className="bg-white border-b border-neutral-200">
+        <div className="container-width section-padding section-spacing">
+          
+          {/* Breadcrumb */}
+          <nav className="text-sm text-neutral-500 mb-6">
+            <div className="flex items-center space-x-2">
+              <span>Home</span>
+              <span>/</span>
+              <span>Products</span>
+              {categoryFilter && (
+                <>
+                  <span>/</span>
+                  <span className="capitalize text-neutral-900">{categoryFilter}</span>
+                </>
+              )}
+            </div>
+          </nav>
+
+          {/* Page Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 font-display">
-                {searchQuery ? `Search Results for "${searchQuery}"` : 
-                 categoryFilter ? `${categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)} Products` : 
+              <h1 className="heading-section mb-4">
+                {searchQuery ? `Search Results` : 
+                 categoryFilter ? `${categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)} Collection` : 
                  'All Products'}
               </h1>
-              <p className="text-gray-600 mt-2">
-                {totalCount} {totalCount === 1 ? 'product' : 'products'} found
-              </p>
+              {searchQuery && (
+                <p className="text-large mb-4">
+                  Results for <span className="font-semibold">"{searchQuery}"</span>
+                </p>
+              )}
+              <div className="flex items-center gap-4 text-small">
+                <span className="font-medium">
+                  {totalCount} {totalCount === 1 ? 'product' : 'products'} found
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-success-500"></span>
+                  <span>Free delivery on orders $65+</span>
+                </div>
+              </div>
             </div>
             
+            {/* Mobile Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
               className="lg:hidden btn-secondary flex items-center"
             >
               <FunnelIcon className="h-5 w-5 mr-2" />
-              Filters
+              Filters & Sort
             </button>
           </div>
-          
-          {/* Breadcrumb */}
-          <nav className="text-sm text-gray-500">
-            <span>Home</span>
-            <span className="mx-2">/</span>
-            <span>Products</span>
-            {categoryFilter && (
-              <>
-                <span className="mx-2">/</span>
-                <span className="capitalize">{categoryFilter}</span>
-              </>
-            )}
-          </nav>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="container-width section-padding py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          
           {/* Filters Sidebar */}
           <div className={`lg:block ${showFilters ? 'block' : 'hidden'}`}>
-            <ProductFilters categories={categories} />
+            <div className="bg-white card p-6 lg:sticky lg:top-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="heading-card">Filters</h3>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="lg:hidden btn-ghost btn-small"
+                >
+                  Done
+                </button>
+              </div>
+              <ProductFilters categories={categories} />
+            </div>
           </div>
 
-          {/* Products Grid */}
-          <div className="lg:col-span-3">
-            {/* Sort Options - Mobile Optimized */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center space-x-2 sm:space-x-4">
-                <AdjustmentsHorizontalIcon className="h-5 w-5 text-gray-400" />
-                <select className="input-field text-sm flex-1 sm:flex-none">
-                  <option>Sort by: Featured</option>
-                  <option>Price: Low to High</option>
-                  <option>Price: High to Low</option>
-                  <option>Name: A to Z</option>
-                  <option>Name: Z to A</option>
-                </select>
-              </div>
-              
-              <div className="text-sm text-gray-500 text-center sm:text-right">
-                Page {currentPage} of {totalPages}
+          {/* Products Section */}
+          <div className="lg:col-span-4">
+            
+            {/* Toolbar */}
+            <div className="bg-white card p-6 mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                
+                {/* Sort & View Options */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <AdjustmentsHorizontalIcon className="h-5 w-5 text-neutral-400" />
+                    <select 
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="input-field text-sm min-w-[180px]"
+                    >
+                      {sortOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* View Mode Toggle */}
+                  <div className="hidden sm:flex items-center border border-neutral-200">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-2 transition-colors ${
+                        viewMode === 'grid' 
+                          ? 'bg-primary-600 text-white' 
+                          : 'text-neutral-600 hover:bg-neutral-50'
+                      }`}
+                    >
+                      <Squares2X2Icon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`p-2 transition-colors ${
+                        viewMode === 'list' 
+                          ? 'bg-primary-600 text-white' 
+                          : 'text-neutral-600 hover:bg-neutral-50'
+                      }`}
+                    >
+                      <ListBulletIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Results Count & Pagination Info */}
+                <div className="text-small text-neutral-500">
+                  Showing {((currentPage - 1) * PRODUCTS_PER_PAGE) + 1}-{Math.min(currentPage * PRODUCTS_PER_PAGE, totalCount)} of {totalCount}
+                </div>
               </div>
             </div>
 
-            {/* Products Grid */}
+            {/* Products Grid/List */}
             {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className={`grid gap-6 ${
+                viewMode === 'grid' 
+                  ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' 
+                  : 'grid-cols-1'
+              }`}>
                 {[...Array(PRODUCTS_PER_PAGE)].map((_, index) => (
-                  <div key={index} className="card p-6">
-                    <div className="w-full h-48 bg-gray-200 rounded-lg shimmer mb-4"></div>
-                    <div className="h-4 bg-gray-200 rounded shimmer mb-2"></div>
-                    <div className="h-4 bg-gray-200 rounded shimmer w-2/3"></div>
+                  <div key={index} className="card p-6 space-y-4">
+                    <div className="skeleton aspect-square"></div>
+                    <div className="skeleton h-6 w-3/4"></div>
+                    <div className="skeleton h-4 w-1/2"></div>
                   </div>
                 ))}
               </div>
             ) : products.length > 0 ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className={`grid gap-6 ${
+                  viewMode === 'grid' 
+                    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' 
+                    : 'grid-cols-1'
+                }`}>
                   {products.map((product) => (
                     <ProductCard 
                       key={product.id} 
                       product={product} 
                       onAddToCart={handleAddToCart}
+                      className={viewMode === 'list' ? 'flex flex-row' : ''}
                     />
                   ))}
                 </div>
@@ -216,7 +316,7 @@ function ProductsContent() {
                       <button
                         onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                         disabled={currentPage === 1}
-                        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="btn-ghost btn-small disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Previous
                       </button>
@@ -229,10 +329,10 @@ function ProductsContent() {
                           <button
                             key={pageNumber}
                             onClick={() => setCurrentPage(pageNumber)}
-                            className={`px-3 py-2 text-sm font-medium rounded-md ${
+                            className={`btn-small ${
                               pageNumber === currentPage
-                                ? 'bg-primary-600 text-white'
-                                : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                                ? 'btn-primary'
+                                : 'btn-ghost'
                             }`}
                           >
                             {pageNumber}
@@ -243,7 +343,7 @@ function ProductsContent() {
                       <button
                         onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                         disabled={currentPage === totalPages}
-                        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="btn-ghost btn-small disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Next
                       </button>
@@ -252,24 +352,27 @@ function ProductsContent() {
                 )}
               </>
             ) : (
-              <div className="text-center py-12">
-                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FunnelIcon className="h-12 w-12 text-gray-400" />
+              <div className="text-center py-16">
+                <div className="bg-white card p-12 max-w-md mx-auto">
+                  <div className="w-16 h-16 bg-neutral-100 flex items-center justify-center mx-auto mb-6">
+                    <FunnelIcon className="h-8 w-8 text-neutral-400" />
+                  </div>
+                  <h3 className="heading-card mb-4">No products found</h3>
+                  <p className="text-body mb-8">
+                    Try adjusting your search or filter criteria to find what you're looking for.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setCurrentPage(1)
+                      setSortBy('featured')
+                      window.history.pushState({}, '', '/products')
+                      fetchProducts()
+                    }}
+                    className="btn-primary"
+                  >
+                    Clear All Filters
+                  </button>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
-                <p className="text-gray-500 mb-6">
-                  Try adjusting your search or filter criteria
-                </p>
-                <button
-                  onClick={() => {
-                    setCurrentPage(1)
-                    window.history.pushState({}, '', '/products')
-                    fetchProducts()
-                  }}
-                  className="btn-primary"
-                >
-                  Clear Filters
-                </button>
               </div>
             )}
           </div>
@@ -282,20 +385,17 @@ function ProductsContent() {
 export default function ProductsPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-neutral-50">
         <div className="container-width section-padding py-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/4 mb-8"></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, index) => (
-                <div key={index} className="card p-6">
-                  <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                </div>
-              ))}
-            </div>
+          <div className="skeleton h-12 w-1/3 mb-8"></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, index) => (
+              <div key={index} className="card p-6 space-y-4">
+                <div className="skeleton aspect-square"></div>
+                <div className="skeleton h-6 w-3/4"></div>
+                <div className="skeleton h-4 w-1/2"></div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

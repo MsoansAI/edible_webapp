@@ -1,68 +1,152 @@
-import React from 'react'
+'use client'
+
 import Image from 'next/image'
-import { Product, ProductOption } from '@/types/database'
+import Link from 'next/link'
+import { ShoppingCartIcon, HeartIcon, StarIcon } from '@heroicons/react/24/outline'
+import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
+import { Product } from '@/types/database'
+import { useState } from 'react'
 
 interface ProductCardProps {
   product: Product
-  options?: ProductOption[]
-  onSelectOption?: (option: ProductOption) => void
-  onAddToCart?: (product: Product, option?: ProductOption) => void
+  onAddToCart?: (product: Product) => void
+  className?: string
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, options = [], onSelectOption, onAddToCart }) => {
+export default function ProductCard({ product, onAddToCart, className = '' }: ProductCardProps) {
+  const [isFavorited, setIsFavorited] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleAddToCart = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!onAddToCart || isLoading) return
+    
+    setIsLoading(true)
+    try {
+      await onAddToCart(product)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleFavoriteToggle = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsFavorited(!isFavorited)
+  }
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(price)
+  }
+
+  const imageUrl = product.image_url || 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp'
+
   return (
-    <div className="card p-4 flex flex-col gap-3 shadow-md rounded-lg bg-white">
-      <div className="w-full aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-        {product.image_url ? (
+    <div className={`card-product group ${className}`}>
+      <Link href={`/products/${product.product_identifier}`} className="block">
+        
+        {/* Product Image */}
+        <div className="relative aspect-square bg-neutral-50 overflow-hidden">
           <Image
-            src={product.image_url}
+            src={imageUrl}
             alt={product.name}
-            width={300}
-            height={300}
-            className="object-cover w-full h-full"
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
           />
-        ) : (
-          <span className="text-gray-400">No image</span>
-        )}
-      </div>
-      <div className="flex-1 flex flex-col gap-2">
-        <h2 className="text-lg font-bold text-gray-900">{product.name}</h2>
-        <p className="text-primary-600 font-semibold text-base">${product.base_price.toFixed(2)}</p>
-        {product.description && (
-          <p className="text-gray-600 text-sm line-clamp-3">{product.description}</p>
-        )}
-        {options.length > 0 && (
-          <div className="mt-2">
-            <h3 className="text-sm font-semibold text-gray-800 mb-1">Options:</h3>
-            <ul className="space-y-1">
-              {options.map(option => (
-                <li key={option.id} className="flex items-center justify-between">
-                  <span>{option.option_name}</span>
-                  <span className="font-medium">${option.price.toFixed(2)}</span>
-                  {onSelectOption && (
-                    <button
-                      className="ml-2 px-2 py-1 text-xs bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
-                      onClick={() => onSelectOption(option)}
-                    >
-                      Select
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+          
+          {/* Favorite Button */}
+          <button
+            onClick={handleFavoriteToggle}
+            className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm flex items-center justify-center transition-all duration-200 hover:bg-white hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            {isFavorited ? (
+              <HeartSolidIcon className="h-5 w-5 text-primary-600" />
+            ) : (
+              <HeartIcon className="h-5 w-5 text-neutral-600 hover:text-primary-600" />
+            )}
+          </button>
+
+          {/* Quick Add Overlay */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-end justify-center p-6 opacity-0 group-hover:opacity-100">
+            <button
+              onClick={handleAddToCart}
+              disabled={isLoading}
+              className="btn-primary btn-small w-full transition-transform duration-200 transform translate-y-4 group-hover:translate-y-0"
+            >
+              {isLoading ? (
+                <div className="loading-spinner mx-auto" />
+              ) : (
+                <>
+                  <ShoppingCartIcon className="h-4 w-4 mr-2" />
+                  Quick Add
+                </>
+              )}
+            </button>
           </div>
-        )}
-      </div>
-      {onAddToCart && (
-        <button
-          className="mt-2 w-full py-2 bg-primary-600 text-white rounded hover:bg-primary-700 font-semibold"
-          onClick={() => onAddToCart(product)}
-        >
-          Add to Cart
-        </button>
-      )}
+        </div>
+
+        {/* Product Info */}
+        <div className="p-6 space-y-4">
+          
+          {/* Rating */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1">
+              {[...Array(5)].map((_, i) => (
+                <StarIcon
+                  key={i}
+                  className={`h-4 w-4 ${
+                    i < 4 ? 'text-warning-500 fill-current' : 'text-neutral-300'
+                  }`}
+                />
+              ))}
+              <span className="text-small ml-2">(4.8)</span>
+            </div>
+            <div className="badge-success">
+              Same Day
+            </div>
+          </div>
+
+          {/* Product Name */}
+          <div>
+            <h3 className="heading-card line-clamp-2 group-hover:text-primary-600 transition-colors duration-200">
+              {product.name}
+            </h3>
+            {product.description && (
+              <p className="text-small line-clamp-2 mt-2">
+                {product.description}
+              </p>
+            )}
+          </div>
+
+          {/* Price */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="product-price-small">
+                {formatPrice(product.base_price)}
+              </span>
+            </div>
+          </div>
+
+          {/* Trust Indicators */}
+          <div className="pt-4 border-t border-neutral-100">
+            <div className="flex items-center justify-between text-small text-neutral-500">
+              <span className="flex items-center">
+                <span className="w-2 h-2 bg-success-500 mr-2"></span>
+                Fresh Guaranteed
+              </span>
+              <span>Free delivery $65+</span>
+            </div>
+          </div>
+
+        </div>
+      </Link>
     </div>
   )
-}
-
-export default ProductCard 
+} 

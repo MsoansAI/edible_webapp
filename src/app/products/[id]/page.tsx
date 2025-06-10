@@ -4,12 +4,11 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeftIcon, HeartIcon, ShareIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, HeartIcon, ShareIcon, MinusIcon, PlusIcon, StarIcon, ShieldCheckIcon, TruckIcon, ClockIcon, CheckIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 import { Product, ProductOption } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 import { useCartStore } from '@/store/cartStore'
-
 import toast from 'react-hot-toast'
 
 export default function ProductDetailPage() {
@@ -22,7 +21,19 @@ export default function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isFavorite, setIsFavorite] = useState(false)
   const [mainImage, setMainImage] = useState<string>('')
+  const [isAddingToCart, setIsAddingToCart] = useState(false)
   const { addItem } = useCartStore()
+
+  // Handle option change and image switching
+  const handleOptionChange = (option: ProductOption | null) => {
+    setSelectedOption(option)
+    // Switch main image based on selected option
+    if (option && option.image_url) {
+      setMainImage(option.image_url)
+    } else if (product) {
+      setMainImage(product.image_url || '')
+    }
+  }
 
   useEffect(() => {
     fetchProduct()
@@ -41,6 +52,7 @@ export default function ProductDetailPage() {
 
       if (productError) {
         console.error('Error fetching product:', productError)
+        toast.error('Product not found')
         router.push('/products')
         return
       }
@@ -53,7 +65,7 @@ export default function ProductDetailPage() {
         .from('product_options')
         .select('*')
         .eq('product_id', productData.id)
-        .eq('is_active', true)
+        .eq('is_available', true)
         .order('price')
 
       if (optionsError) {
@@ -63,39 +75,47 @@ export default function ProductDetailPage() {
       }
     } catch (error) {
       console.error('Error fetching product:', error)
+      toast.error('Failed to load product')
       router.push('/products')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleAddToCart = () => {
-    if (!product) return
+  const handleAddToCart = async () => {
+    if (!product || isAddingToCart) return
 
-    const price = selectedOption ? selectedOption.price : product.base_price
-    const name = selectedOption ? `${product.name} - ${selectedOption.option_name}` : product.name
+    setIsAddingToCart(true)
+    try {
+      const name = selectedOption ? `${product.name} - ${selectedOption.option_name}` : product.name
+      
+      addItem(product, selectedOption || undefined, quantity)
+      toast.success(`Added ${name} to cart!`)
+    } finally {
+      setIsAddingToCart(false)
+    }
+  }
 
-    addItem(product, selectedOption || undefined, quantity)
-
-    toast.success(`Added ${name} to cart!`)
+  const handleFavoriteToggle = () => {
+    setIsFavorite(!isFavorite)
+    toast.success(isFavorite ? 'Removed from favorites' : 'Added to favorites')
   }
 
   const currentPrice = selectedOption ? selectedOption.price : product?.base_price || 0
+  const totalPrice = currentPrice * quantity
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white">
         <div className="container-width section-padding py-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-32 mb-6"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="aspect-square bg-gray-200 rounded-lg"></div>
-              <div className="space-y-4">
-                <div className="h-8 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-6 bg-gray-200 rounded w-1/4"></div>
-                <div className="h-32 bg-gray-200 rounded"></div>
-              </div>
+          <div className="skeleton h-8 w-32 mb-8"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <div className="skeleton aspect-square"></div>
+            <div className="space-y-6">
+              <div className="skeleton h-8 w-3/4"></div>
+              <div className="skeleton h-6 w-1/4"></div>
+              <div className="skeleton h-24 w-full"></div>
+              <div className="skeleton h-32 w-full"></div>
             </div>
           </div>
         </div>
@@ -105,11 +125,12 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="container-width section-padding py-16 text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Product not found</h1>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="heading-section mb-6">Product Not Found</h1>
+          <p className="text-large mb-8">The product you're looking for doesn't exist or has been removed.</p>
           <Link href="/products" className="btn-primary">
-            Back to Products
+            Browse All Products
           </Link>
         </div>
       </div>
@@ -119,97 +140,170 @@ export default function ProductDetailPage() {
   return (
     <div className="min-h-screen bg-white">
       
-      <div className="container-width section-padding py-6 sm:py-8">
+      {/* Breadcrumb */}
+      <div className="border-b border-neutral-100">
+        <div className="container-width section-padding py-4">
+          <nav className="flex items-center space-x-2 text-sm text-neutral-500">
+            <Link href="/" className="hover:text-primary-600">Home</Link>
+            <span>/</span>
+            <Link href="/products" className="hover:text-primary-600">Products</Link>
+            <span>/</span>
+            <span className="text-neutral-900 font-medium truncate">{product.name}</span>
+          </nav>
+        </div>
+      </div>
+
+      <div className="container-width section-padding py-8">
+        
         {/* Back Button */}
         <Link 
           href="/products" 
-          className="inline-flex items-center text-gray-600 hover:text-primary-600 mb-6 transition-colors duration-200"
+          className="inline-flex items-center text-neutral-600 hover:text-primary-600 mb-8 transition-colors duration-200 hover-lift"
         >
           <ArrowLeftIcon className="h-5 w-5 mr-2" />
           Back to Products
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-          {/* Product Images */}
-          <div className="space-y-4">
-            <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+          
+          {/* Sticky Product Images */}
+          <div className="lg:sticky lg:top-24 lg:self-start space-y-6">
+            <div className="relative aspect-square bg-neutral-50 overflow-hidden">
               {mainImage ? (
                 <Image
                   src={mainImage}
                   alt={product.name}
-                  width={600}
-                  height={600}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  priority
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-gray-400">No image available</span>
+                  <span className="text-neutral-400">No image available</span>
                 </div>
               )}
+              <div className="product-badge">Premium Quality</div>
             </div>
             
-            {/* Additional images would go here */}
-            <div className="grid grid-cols-4 gap-2">
-              {/* Placeholder for additional product images */}
+            {/* Trust Indicators */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="security-badge">
+                <ShieldCheckIcon className="h-4 w-4 mr-2" />
+                Quality Guaranteed
+              </div>
+              <div className="trust-badge">
+                <TruckIcon className="h-4 w-4 mr-2" />
+                Same-Day Available
+              </div>
             </div>
           </div>
 
           {/* Product Info */}
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-display mb-2">
-                {product.name}
-              </h1>
-              <p className="text-lg sm:text-xl font-semibold text-primary-600">
-                ${currentPrice.toFixed(2)}
-              </p>
+          <div className="space-y-8">
+            
+            {/* Product Header */}
+            <div className="space-y-4">
+              <div className="flex items-start justify-between">
+                <h1 className="heading-section flex-1 pr-4">
+                  {product.name}
+                </h1>
+                <button
+                  onClick={handleFavoriteToggle}
+                  className="p-3 hover:bg-neutral-50 transition-colors focus-ring"
+                  aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  {isFavorite ? (
+                    <HeartSolidIcon className="h-6 w-6 text-primary-600" />
+                  ) : (
+                    <HeartIcon className="h-6 w-6 text-neutral-600" />
+                  )}
+                </button>
+              </div>
+
+              {/* Rating & Reviews */}
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-1">
+                  {[...Array(5)].map((_, i) => (
+                    <StarIcon
+                      key={i}
+                      className={`h-5 w-5 ${
+                        i < 4 ? 'text-warning-500 fill-current' : 'text-neutral-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-neutral-600">(4.8) • 124 reviews</span>
+              </div>
+
+              {/* Price */}
+              <div className="flex items-center space-x-4">
+                <span className="product-price">${currentPrice.toFixed(2)}</span>
+                <div className="badge-success">Free delivery $65+</div>
+              </div>
             </div>
 
             {/* Product Description */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-              <p className="text-gray-600 leading-relaxed">
-                {product.description || 'No description available for this product.'}
+              <h3 className="heading-card mb-4">Description</h3>
+              <p className="text-body leading-relaxed">
+                {product.description || 'A premium handcrafted arrangement made with the freshest ingredients. Perfect for any special occasion or as a thoughtful gift to show you care.'}
               </p>
             </div>
 
-            {/* Product Options */}
+            {/* Product Options - Simple Rectangles (like Edible Arrangements) */}
             {options.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Options</h3>
-                <div className="grid grid-cols-1 gap-3">
+                <h3 className="heading-card mb-4">Choose an Option:</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Standard Size Option */}
                   <button
-                    onClick={() => setSelectedOption(null)}
-                    className={`p-4 border rounded-lg text-left transition-colors duration-200 ${
+                    onClick={() => handleOptionChange(null)}
+                    className={`flex items-center p-3 border transition-all duration-200 ${
                       !selectedOption 
-                        ? 'border-primary-600 bg-primary-50 text-primary-600' 
-                        : 'border-gray-300 hover:border-gray-400'
+                        ? 'border-primary-600 bg-white ring-2 ring-primary-600' 
+                        : 'border-neutral-200 hover:border-neutral-300 bg-white'
                     }`}
                   >
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Standard</span>
-                      <span className="font-semibold">${product.base_price.toFixed(2)}</span>
+                    <div className="w-16 h-12 bg-neutral-100 mr-3 flex-shrink-0 relative overflow-hidden">
+                      <Image
+                        src={product.image_url || 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp'}
+                        alt="Standard Size"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold text-sm text-neutral-900">Standard</div>
+                      <div className="font-bold text-primary-600">${product.base_price.toFixed(2)}</div>
+                      <p className="text-xs text-neutral-600">Perfect for most occasions</p>
                     </div>
                   </button>
                   
+                  {/* Dynamic Options */}
                   {options.map((option) => (
                     <button
                       key={option.id}
-                      onClick={() => setSelectedOption(option)}
-                      className={`p-4 border rounded-lg text-left transition-colors duration-200 ${
+                      onClick={() => handleOptionChange(option)}
+                      className={`flex items-center p-3 border transition-all duration-200 ${
                         selectedOption?.id === option.id 
-                          ? 'border-primary-600 bg-primary-50 text-primary-600' 
-                          : 'border-gray-300 hover:border-gray-400'
+                          ? 'border-primary-600 bg-white ring-2 ring-primary-600' 
+                          : 'border-neutral-200 hover:border-neutral-300 bg-white'
                       }`}
                     >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="font-medium">{option.option_name}</div>
-                          {option.description && (
-                            <div className="text-sm text-gray-500 mt-1">{option.description}</div>
-                          )}
-                        </div>
-                        <span className="font-semibold">${option.price.toFixed(2)}</span>
+                      <div className="w-16 h-12 bg-neutral-100 mr-3 flex-shrink-0 relative overflow-hidden">
+                        <Image
+                          src={option.image_url || product.image_url || 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp'}
+                          alt={option.option_name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="font-semibold text-sm text-neutral-900">{option.option_name}</div>
+                        <div className="font-bold text-primary-600">${option.price.toFixed(2)}</div>
+                        {option.description && (
+                          <p className="text-xs text-neutral-600">{option.description}</p>
+                        )}
                       </div>
                     </button>
                   ))}
@@ -219,29 +313,32 @@ export default function ProductDetailPage() {
 
             {/* Quantity Selector */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Quantity</h3>
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center border border-gray-300 rounded-lg">
+              <h3 className="heading-card mb-4">Quantity</h3>
+              <div className="flex items-center justify-between">
+                <div className="quantity-selector">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-3 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                    className="quantity-btn"
                     disabled={quantity <= 1}
+                    aria-label="Decrease quantity"
                   >
                     <MinusIcon className="h-4 w-4" />
                   </button>
-                  <span className="px-4 py-3 text-center min-w-[3rem] border-x border-gray-300">
+                  <span className="px-6 py-3 text-center min-w-[4rem] font-semibold border-x border-neutral-300">
                     {quantity}
                   </span>
                   <button
                     onClick={() => setQuantity(quantity + 1)}
-                    className="p-3 text-gray-600 hover:text-gray-800"
+                    className="quantity-btn"
+                    aria-label="Increase quantity"
                   >
                     <PlusIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <span className="text-gray-600">
-                  Total: ${(currentPrice * quantity).toFixed(2)}
-                </span>
+                <div className="text-right">
+                  <p className="text-sm text-neutral-600">Total Price</p>
+                  <p className="text-2xl font-bold text-neutral-900">${totalPrice.toFixed(2)}</p>
+                </div>
               </div>
             </div>
 
@@ -249,47 +346,140 @@ export default function ProductDetailPage() {
             <div className="space-y-4">
               <button
                 onClick={handleAddToCart}
-                className="btn-primary w-full text-lg py-3"
+                disabled={isAddingToCart}
+                className="btn-primary btn-large w-full"
               >
-                Add to Cart - ${(currentPrice * quantity).toFixed(2)}
+                {isAddingToCart ? (
+                  <div className="loading-spinner mx-auto"></div>
+                ) : (
+                  `Add to Cart • $${totalPrice.toFixed(2)}`
+                )}
               </button>
               
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => setIsFavorite(!isFavorite)}
-                  className="flex-1 btn-secondary flex items-center justify-center"
-                >
-                  {isFavorite ? (
-                    <HeartSolidIcon className="h-5 w-5 mr-2 text-red-500" />
-                  ) : (
-                    <HeartIcon className="h-5 w-5 mr-2" />
-                  )}
-                  {isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+              <div className="grid grid-cols-2 gap-4">
+                <button className="btn-secondary flex items-center justify-center">
+                  <ShareIcon className="h-5 w-5 mr-2" />
+                  Share
                 </button>
-                
-                <button className="btn-secondary flex items-center justify-center px-4">
-                  <ShareIcon className="h-5 w-5" />
-                </button>
+                <Link href="/checkout" className="btn-secondary flex items-center justify-center">
+                  Buy Now
+                </Link>
+              </div>
+            </div>
+
+            {/* Delivery & Service Info */}
+            <div className="card p-6 space-y-4">
+              <h4 className="heading-card">Delivery & Service</h4>
+              <div className="space-y-3">
+                <div className="flex items-center text-sm">
+                  <TruckIcon className="h-5 w-5 text-success-600 mr-3 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-neutral-900">Same-Day Delivery Available</p>
+                    <p className="text-neutral-600">Order by 2PM for same-day delivery</p>
+                  </div>
+                </div>
+                <div className="flex items-center text-sm">
+                  <ShieldCheckIcon className="h-5 w-5 text-success-600 mr-3 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-neutral-900">Freshness Guarantee</p>
+                    <p className="text-neutral-600">100% satisfaction or your money back</p>
+                  </div>
+                </div>
+                <div className="flex items-center text-sm">
+                  <ClockIcon className="h-5 w-5 text-success-600 mr-3 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-neutral-900">Handcrafted Fresh</p>
+                    <p className="text-neutral-600">Made to order by our skilled artisans</p>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Product Details */}
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Product Details</h3>
-              <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Product ID:</dt>
-                  <dd className="text-gray-900">{product.product_identifier}</dd>
+            <div className="border-t border-neutral-200 pt-8">
+              <h4 className="heading-card mb-4">Product Details</h4>
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-neutral-600 font-medium">Product ID</dt>
+                  <dd className="text-neutral-900">{product.product_identifier}</dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Same-day delivery:</dt>
-                  <dd className="text-green-600">Available</dd>
+                <div>
+                  <dt className="text-neutral-600 font-medium">Delivery</dt>
+                  <dd className="text-success-600 font-medium">Same-day available</dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-600 font-medium">Allergen Info</dt>
+                  <dd className="text-neutral-900">May contain nuts</dd>
+                </div>
+                <div>
+                  <dt className="text-neutral-600 font-medium">Storage</dt>
+                  <dd className="text-neutral-900">Refrigerate upon receipt</dd>
                 </div>
               </dl>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Mobile Sticky Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 z-40 safe-area-pb">
+        <div className="container-width section-padding py-4">
+          <div className="flex items-center justify-between space-x-4">
+            {/* Quantity & Price Summary */}
+            <div className="flex items-center space-x-4">
+              <div className="quantity-selector">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="quantity-btn"
+                  disabled={quantity <= 1}
+                  aria-label="Decrease quantity"
+                >
+                  <MinusIcon className="h-4 w-4" />
+                </button>
+                <span className="px-4 py-2 text-center min-w-[3rem] font-semibold border-x border-neutral-300">
+                  {quantity}
+                </span>
+                <button
+                  onClick={() => setQuantity(quantity + 1)}
+                  className="quantity-btn"
+                  aria-label="Increase quantity"
+                >
+                  <PlusIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-neutral-600">Total</p>
+                <p className="text-xl font-bold text-neutral-900">${totalPrice.toFixed(2)}</p>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={handleAddToCart}
+              disabled={isAddingToCart}
+              className="btn-primary flex-1 max-w-[200px] py-3 px-6"
+            >
+              {isAddingToCart ? (
+                <div className="loading-spinner mx-auto"></div>
+              ) : (
+                'Add to Cart'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Bottom Padding */}
+      <div className="h-20"></div>
+
+      {/* Floating Chat Button */}
+      <button
+        className="fixed right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50 bottom-24"
+        aria-label="Open chat support"
+        onClick={() => toast.success('Chat feature coming soon!')}
+      >
+        <ChatBubbleLeftRightIcon className="h-6 w-6" />
+      </button>
     </div>
   )
 } 

@@ -81,8 +81,16 @@ export default function ProfilePage() {
     allergies: [] as string[],
     dietaryRestrictions: [] as string[]
   })
+  const [originalForm, setOriginalForm] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    allergies: [] as string[],
+    dietaryRestrictions: [] as string[]
+  })
   const [newAllergy, setNewAllergy] = useState('')
   const [newDietary, setNewDietary] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
   const [preferences, setPreferences] = useState({
     emailNotifications: true,
     smsNotifications: false,
@@ -140,13 +148,15 @@ export default function ProfilePage() {
           setProfile(data.profile)
           setOrders(data.orderHistory || [])
           setAddresses(data.addresses || [])
-          setEditForm({
+          const formData = {
             firstName: data.profile.firstName || '',
             lastName: data.profile.lastName || '',
             phone: data.profile.phone || '',
             allergies: data.profile.allergies || [],
             dietaryRestrictions: data.profile.dietaryRestrictions || []
-          })
+          }
+          setEditForm(formData)
+          setOriginalForm(formData)
           // Set preferences from profile or defaults
           setPreferences({
             emailNotifications: data.profile.preferences?.emailNotifications ?? true,
@@ -173,36 +183,83 @@ export default function ProfilePage() {
   const updateProfile = async () => {
     if (!profile) return
 
+    setIsSaving(true)
     try {
-      const { error } = await supabase
-        .from('customers')
-        .update({
-          first_name: editForm.firstName,
-          last_name: editForm.lastName,
-          phone: editForm.phone,
-          allergies: editForm.allergies,
-          dietary_restrictions: editForm.dietaryRestrictions
+      // Get current session to get authUserId
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        toast.error('Please sign in again to update your profile')
+        return
+      }
+
+      // Build update object with only changed fields
+      const updates: any = {}
+      
+      if (editForm.firstName !== originalForm.firstName) {
+        updates.firstName = editForm.firstName
+      }
+      if (editForm.lastName !== originalForm.lastName) {
+        updates.lastName = editForm.lastName
+      }
+      if (editForm.phone !== originalForm.phone) {
+        updates.phone = editForm.phone
+      }
+      if (JSON.stringify(editForm.allergies) !== JSON.stringify(originalForm.allergies)) {
+        updates.allergies = editForm.allergies
+      }
+      if (JSON.stringify(editForm.dietaryRestrictions) !== JSON.stringify(originalForm.dietaryRestrictions)) {
+        updates.dietaryRestrictions = editForm.dietaryRestrictions
+      }
+
+      // Only make API call if there are changes
+      if (Object.keys(updates).length === 0) {
+        toast.success('No changes to save')
+        setIsEditing(false)
+        return
+      }
+
+      // Call the enhanced API that updates both customers and auth tables
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authUserId: session.user.id,
+          ...updates
         })
-        .eq('id', profile.id)
-
-      if (error) throw error
-
-      setProfile({
-        ...profile,
-        firstName: editForm.firstName,
-        lastName: editForm.lastName,
-        name: `${editForm.firstName} ${editForm.lastName}`.trim(),
-        phone: editForm.phone,
-        allergies: editForm.allergies,
-        dietaryRestrictions: editForm.dietaryRestrictions
       })
 
-      setIsEditing(false)
-      toast.success('Profile updated successfully!')
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        // Update local state with the returned profile
+        setProfile({
+          ...profile,
+          ...data.profile,
+          name: data.profile.name
+        })
+
+        // Update the original form state to match current
+        setOriginalForm(editForm)
+        setIsEditing(false)
+        
+        const changedFields = Object.keys(updates)
+        toast.success(`Updated ${changedFields.join(', ')} successfully!`)
+      } else {
+        throw new Error(data.message || 'Failed to update profile')
+      }
     } catch (error) {
       console.error('Error updating profile:', error)
-      toast.error('Failed to update profile')
+      toast.error('Failed to update profile. Please try again.')
+    } finally {
+      setIsSaving(false)
     }
+  }
+
+  const cancelEditing = () => {
+    setEditForm(originalForm)
+    setIsEditing(false)
+    setNewAllergy('')
+    setNewDietary('')
   }
 
   const addAllergy = () => {
@@ -480,16 +537,27 @@ export default function ProfilePage() {
                 <div className="card p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-gray-900">Profile Information</h3>
-                    <button
-                      onClick={() => setIsEditing(!isEditing)}
-                      className="btn-secondary text-sm px-4 py-2"
-                    >
-                      {isEditing ? 'Cancel' : 'Edit Profile'}
-                    </button>
+                    {!isEditing ? (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="btn-secondary text-sm px-4 py-2 flex items-center"
+                      >
+                        <PencilIcon className="h-4 w-4 mr-2" />
+                        Modify
+                      </button>
+                    ) : (
+                      <button
+                        onClick={cancelEditing}
+                        className="btn-secondary text-sm px-4 py-2 flex items-center"
+                      >
+                        <XMarkIcon className="h-4 w-4 mr-2" />
+                        Cancel
+                      </button>
+                    )}
                   </div>
 
                   {isEditing ? (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
@@ -497,6 +565,7 @@ export default function ProfilePage() {
                             type="text"
                             value={editForm.firstName}
                             onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                            placeholder="Enter your first name"
                             className="input-field"
                           />
                         </div>
@@ -506,6 +575,7 @@ export default function ProfilePage() {
                             type="text"
                             value={editForm.lastName}
                             onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                            placeholder="Enter your last name"
                             className="input-field"
                           />
                         </div>
@@ -516,47 +586,107 @@ export default function ProfilePage() {
                           type="tel"
                           value={editForm.phone}
                           onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                          placeholder="Enter your phone number (e.g., +1234567890)"
                           className="input-field"
                         />
                       </div>
-                      <div className="flex space-x-3">
-                        <button onClick={updateProfile} className="btn-primary">
-                          Save Changes
+                      
+                      {/* Save/Cancel buttons */}
+                      <div className="flex space-x-3 pt-4 border-t border-gray-200">
+                        <button 
+                          onClick={updateProfile} 
+                          disabled={isSaving}
+                          className="btn-primary flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSaving ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircleIcon className="h-4 w-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
                         </button>
-                        <button onClick={() => setIsEditing(false)} className="btn-secondary">
+                        <button 
+                          onClick={cancelEditing} 
+                          disabled={isSaving}
+                          className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                           Cancel
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">First Name</label>
-                        <p className="mt-1 text-gray-900">{profile.firstName || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Last Name</label>
-                        <p className="mt-1 text-gray-900">{profile.lastName || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                        <p className="mt-1 text-gray-900">{profile.email}</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Phone</label>
-                        <p className="mt-1 text-gray-900">{profile.phone || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Member Since</label>
-                        <p className="mt-1 text-gray-900">
-                          {profile.stats?.memberSince ? formatDate(profile.stats.memberSince) : 'Recently joined'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Customer Tier</label>
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-1 ${getTierColor(profile.tier)}`}>
-                          {profile.tier.charAt(0).toUpperCase() + profile.tier.slice(1)}
-                        </span>
+                    <div className="space-y-6">
+                      {/* Check if profile is incomplete */}
+                      {(!profile.firstName || !profile.lastName || !profile.phone) && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                          <div className="flex items-center">
+                            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mr-3" />
+                            <div>
+                              <h4 className="text-sm font-medium text-yellow-800">Complete Your Profile</h4>
+                              <p className="text-sm text-yellow-700 mt-1">
+                                Add missing information to get personalized recommendations and better support.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">First Name</label>
+                          {profile.firstName ? (
+                            <p className="mt-1 text-gray-900 font-medium">{profile.firstName}</p>
+                          ) : (
+                            <p className="mt-1 text-gray-500 italic flex items-center">
+                              <PlusIcon className="h-4 w-4 mr-1" />
+                              Click modify to add
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                          {profile.lastName ? (
+                            <p className="mt-1 text-gray-900 font-medium">{profile.lastName}</p>
+                          ) : (
+                            <p className="mt-1 text-gray-500 italic flex items-center">
+                              <PlusIcon className="h-4 w-4 mr-1" />
+                              Click modify to add
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Email</label>
+                          <p className="mt-1 text-gray-900 font-medium">{profile.email}</p>
+                          <p className="text-xs text-gray-500 mt-1">This is your login email</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+                          {profile.phone ? (
+                            <p className="mt-1 text-gray-900 font-medium">{profile.phone}</p>
+                          ) : (
+                            <p className="mt-1 text-gray-500 italic flex items-center">
+                              <PlusIcon className="h-4 w-4 mr-1" />
+                              Click modify to add
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Member Since</label>
+                          <p className="mt-1 text-gray-900">
+                            {profile.stats?.memberSince ? formatDate(profile.stats.memberSince) : 'Recently joined'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Customer Tier</label>
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mt-1 ${getTierColor(profile.tier || 'new')}`}>
+                            {profile.tier ? profile.tier.charAt(0).toUpperCase() + profile.tier.slice(1) : 'New'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   )}

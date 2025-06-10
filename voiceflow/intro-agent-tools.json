@@ -1,0 +1,233 @@
+{
+  "intro_agent_tools": [
+    {
+      "name": "checkCustomerContext",
+      "description": "Gather comprehensive customer state information for routing decisions",
+      "type": "composite_api",
+      "endpoints": [
+        {
+          "name": "customer_profile",
+          "method": "POST",
+          "url": "{{SUPABASE_URL}}/functions/v1/customer-management",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer {{SUPABASE_ANON_KEY}}"
+          },
+          "body": {
+            "phone": "{{phone_number}}",
+            "email": "{{email}}",
+            "authUserId": "{{user_id}}",
+            "source": "intro-agent"
+          }
+        },
+        {
+          "name": "cart_status",
+          "method": "POST", 
+          "url": "{{SUPABASE_URL}}/functions/v1/cart-manager",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer {{SUPABASE_ANON_KEY}}"
+          },
+          "body": {
+            "action": "summary",
+            "userId": "{{user_id}}",
+            "sessionId": "{{session_id}}"
+          }
+        }
+      ],
+      "response_mapping": {
+        "customer_id": "customer_profile.customer._internalId",
+        "customer_name": "customer_profile.customer.firstName",
+        "is_authenticated": "customer_profile.customer.isNewAccount === false",
+        "order_count": "customer_profile.orderHistory ? customer_profile.orderHistory.length : 0",
+        "recent_order": "customer_profile.orderHistory && customer_profile.orderHistory.length > 0 ? customer_profile.orderHistory[0] : null",
+        "has_cart_items": "cart_status.summary.itemCount > 0",
+        "cart_item_count": "cart_status.summary.itemCount",
+        "cart_total": "cart_status.summary.total",
+        "cart_items": "cart_status.summary.items"
+      }
+    },
+    {
+      "name": "routeToAgent",
+      "description": "Route customer to appropriate specialized agent with context",
+      "type": "internal_routing",
+      "parameters": {
+        "targetAgent": {
+          "type": "string",
+          "enum": ["ordering", "order-management", "intro-support"],
+          "description": "The specialized agent to route to"
+        },
+        "context": {
+          "type": "object",
+          "description": "Customer context package for handoff"
+        },
+        "routingReason": {
+          "type": "string", 
+          "description": "Reason for routing decision"
+        },
+        "handoffMessage": {
+          "type": "string",
+          "description": "Message to display during handoff"
+        }
+      },
+      "routing_logic": {
+        "ordering": {
+          "flow_id": "ordering_agent_flow",
+          "context_variables": {
+            "handoff_context": "{{context}}",
+            "routing_reason": "{{routingReason}}",
+            "customer_intent": "ordering",
+            "has_cart_items": "{{context.cart.hasItems}}",
+            "customer_name": "{{context.customer.name}}",
+            "customer_id": "{{context.customer.customerId}}"
+          }
+        },
+        "order-management": {
+          "flow_id": "order_management_flow", 
+          "context_variables": {
+            "handoff_context": "{{context}}",
+            "routing_reason": "order_management",
+            "customer_intent": "order_management",
+            "recent_order": "{{context.orderHistory.recentOrder}}",
+            "customer_name": "{{context.customer.name}}",
+            "customer_id": "{{context.customer.customerId}}"
+          }
+        },
+        "intro-support": {
+          "flow_id": "current_flow",
+          "action": "continue",
+          "enable_support_tools": true
+        }
+      }
+    },
+    {
+      "name": "getProductInfo",
+      "description": "Get general product information for customer questions",
+      "type": "api",
+      "endpoint": {
+        "method": "POST",
+        "url": "{{SUPABASE_URL}}/functions/v1/product-search",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer {{SUPABASE_ANON_KEY}}"
+        }
+      },
+      "parameters": {
+        "query": {
+          "type": "string",
+          "description": "Customer's product question or search term",
+          "required": true
+        },
+        "limit": {
+          "type": "integer",
+          "default": 3,
+          "description": "Number of products to return"
+        },
+        "informationOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Return product info without purchase intent"
+        }
+      }
+    },
+    {
+      "name": "findNearestStore",
+      "description": "Find store location based on customer ZIP code",
+      "type": "api",
+      "endpoint": {
+        "method": "GET",
+        "url": "{{SUPABASE_URL}}/functions/v1/franchisee-inventory/find-nearest",
+        "headers": {
+          "Authorization": "Bearer {{SUPABASE_ANON_KEY}}"
+        }
+      },
+      "parameters": {
+        "zipCode": {
+          "type": "string",
+          "required": true,
+          "description": "Customer's ZIP code"
+        }
+      }
+    }
+  ],
+  "routing_decision_logic": {
+    "order_management_keywords": [
+      "track",
+      "tracking", 
+      "status",
+      "modify",
+      "cancel",
+      "change",
+      "update",
+      "delivery",
+      "where is my order",
+      "order status"
+    ],
+    "ordering_keywords": [
+      "order",
+      "buy",
+      "purchase", 
+      "birthday",
+      "anniversary",
+      "valentine",
+      "gift",
+      "arrangement",
+      "flowers",
+      "chocolate"
+    ],
+    "general_support_keywords": [
+      "hours",
+      "location",
+      "store",
+      "ingredients",
+      "allergens",
+      "price",
+      "what do you have",
+      "help",
+      "information"
+    ]
+  },
+  "greeting_templates": {
+    "new_customer_no_cart": "Hi there! Welcome to Edible Arrangements! I'm here to help you with whatever you need today. Are you looking to place an order, or do you have questions about our products?",
+    "new_customer_with_cart": "Hi there! Welcome to Edible Arrangements! I notice you have {cart_item_count} item{plural} in your cart worth ${cart_total}. Would you like some help completing your order, or is there something else I can assist you with today?",
+    "returning_customer_no_cart": "Welcome back, {customer_name}! Great to see you again. I see you've ordered with us {order_count} time{plural} before - thanks for being such a valued customer! What can I help you with today?",
+    "returning_customer_with_cart": "Welcome back, {customer_name}! I notice you have {cart_item_count} item{plural} in your cart worth ${cart_total}. Would you like some help completing your order, or is there something else I can assist you with today?",
+    "returning_customer_recent_order": "Hello {customer_name}! I see you recently placed order {order_number} for ${order_total}. It's currently {order_status}. Are you checking on this order, or is there something new I can help you with?"
+  },
+  "handoff_messages": {
+    "to_ordering_with_cart": "Perfect! Let me connect you with our ordering specialist who can help you complete your purchase. They'll have all your cart information ready.",
+    "to_ordering_new_order": "Great! Let me connect you with our ordering specialist who can help you find the perfect arrangement and place your order.",
+    "to_order_management": "I understand you need help with your existing order. Let me connect you with our order management team who can access your order details and make any necessary changes.",
+    "stay_for_support": "I'd be happy to help you with that! Let me get you the information you need."
+  },
+  "error_handling": {
+    "context_gathering_failed": {
+      "fallback_greeting": "Hi there! Welcome to Edible Arrangements! I'm here to help you with whatever you need today. How can I assist you?",
+      "set_defaults": {
+        "customer_name": "there",
+        "is_authenticated": false,
+        "order_count": 0,
+        "has_cart_items": false,
+        "cart_item_count": 0,
+        "cart_total": 0
+      }
+    },
+    "unclear_intent": {
+      "clarification_message": "I want to make sure I get you to the right person to help. Could you tell me a bit more about what you're looking to do today? Are you:\n• Looking to place a new order\n• Checking on an existing order\n• Just browsing or have general questions",
+      "clarification_options": [
+        {
+          "text": "Place a new order",
+          "route": "ordering"
+        },
+        {
+          "text": "Check existing order", 
+          "route": "order-management"
+        },
+        {
+          "text": "General questions",
+          "route": "intro-support"
+        }
+      ]
+    }
+  }
+} 

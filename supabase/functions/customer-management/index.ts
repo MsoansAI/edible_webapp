@@ -101,10 +101,17 @@ Deno.serve(async (req)=>{\n  if (req.method === 'OPTIONS') {
       });
     }
     const requestData = await req.json();
-    // Validate required fields
-    if (!requestData.phone && !requestData.email) {
+    
+    // Enhanced validation logic to handle intro agent scenarios
+    const hasPhoneOrEmail = requestData.phone || requestData.email;
+    const hasAuthUser = requestData.authUserId;
+    const hasSessionId = requestData.sessionId;
+    
+    // Allow requests if we have any of: phone/email, authenticated user, or session ID
+    if (!hasPhoneOrEmail && !hasAuthUser && !hasSessionId) {
       return new Response(JSON.stringify({
-        error: 'Either phone or email is required'
+        error: 'At least one identifier required',
+        message: 'Please provide phone, email, user authentication, or session ID'
       }), {
         status: 400,
         headers: {
@@ -113,6 +120,7 @@ Deno.serve(async (req)=>{\n  if (req.method === 'OPTIONS') {
         }
       });
     }
+
     return await handleCustomerManagement(supabase, requestData);
   } catch (error) {
     console.error('Customer management error:', error);
@@ -179,6 +187,20 @@ async function findAllMatchingAccounts(supabase, requestData) {
       }
     }
   }
+  // Search by session ID (for anonymous users) - stored in preferences
+  if (requestData.sessionId && accounts.length === 0) {
+    const { data: sessionMatch } = await supabase
+      .from('customers')
+      .select('*')
+      .contains('preferences', { session_id: requestData.sessionId });
+    if (sessionMatch && sessionMatch.length > 0) {
+      for (const account of sessionMatch){
+        if (!accounts.find((a)=>a.id === account.id)) {
+          accounts.push(account);
+        }
+      }
+    }
+  }
   return accounts;
 }
 async function createNewAccount(supabase, requestData) {
@@ -196,6 +218,8 @@ async function createNewAccount(supabase, requestData) {
       ],
       created_via: requestData.source,
       last_updated_via: requestData.source,
+      // Store session ID for anonymous user tracking
+      session_id: requestData.sessionId || null,
       // Enhanced profile information
       preferred_contact_method: requestData.preferredContactMethod || 'phone',
       preferred_delivery_time: requestData.preferredDeliveryTime || null,
@@ -376,8 +400,121 @@ async function updateExistingAccount(supabase, existingAccount, requestData) {
   });
 }
 async function handleDuplicateAccounts(supabase, accounts, requestData) {
-  // This is a serious issue - multiple accounts for same person
-  // Return conflict information for manual resolution
+  // Enhanced: Try automatic merging for multiple scenarios
+  try {
+    let compatibilityCheck = null;
+    let mergeAttempted = false;
+
+    // Scenario 1: Both phone and email provided (traditional merge)
+    if (requestData.phone && requestData.email && accounts.length === 2) {
+      const { data: emailPhoneCheck, error: compatibilityError } = await supabase.rpc('check_merge_compatibility', {
+        p_phone: requestData.phone,
+        p_email: requestData.email
+      });
+
+      if (!compatibilityError && emailPhoneCheck?.can_merge) {
+        compatibilityCheck = emailPhoneCheck;
+        mergeAttempted = true;
+      }
+    }
+
+    // Scenario 2: Phone number duplicates (including temp emails) - NEW!
+    if (!mergeAttempted && requestData.phone) {
+      const { data: phoneCheck, error: phoneError } = await supabase.rpc('detect_phone_duplicates', {
+        p_phone: requestData.phone
+      });
+
+      if (!phoneError && phoneCheck?.can_auto_merge) {
+        // Convert phone duplicate check to compatibility format
+        compatibilityCheck = {
+          can_merge: true,
+          merge_type: 'phone_consolidation',
+          primary_account: phoneCheck.primary_account,
+          total_accounts: phoneCheck.total_accounts,
+          temp_accounts: phoneCheck.temp_accounts
+        };
+        mergeAttempted = true;
+      }
+    }
+
+    // Perform merge if compatible scenario found
+    if (compatibilityCheck?.can_merge) {
+      const { data: mergeResult, error: mergeError } = await supabase.rpc('merge_customer_accounts', {
+        p_phone: requestData.phone,
+        p_email: requestData.email || null,
+        p_source: requestData.source || 'automatic'
+      });
+
+      if (mergeError) {
+        console.error('Merge error:', mergeError);
+      } else if (mergeResult?.success) {
+        // Merge successful - return the unified account
+        const { data: unifiedCustomer, error: customerError } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', mergeResult.primary_account_id)
+          .single();
+
+        if (!customerError && unifiedCustomer) {
+          // Get order history for the unified account
+          const { data: orders } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('customer_id', unifiedCustomer.id)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+          const accountSources = unifiedCustomer.preferences?.account_sources || ['phone', 'webapp'];
+          
+          // Enhanced response based on merge type
+          let summaryMessage;
+          if (mergeResult.merge_type === 'phone_consolidation') {
+            summaryMessage = `Welcome back! I've consolidated ${mergeResult.consolidated_accounts} duplicate phone accounts. ${mergeResult.total_orders > 0 ? `You now have ${mergeResult.total_orders} orders in your complete history.` : 'Ready to place your first order?'}`;
+          } else {
+            summaryMessage = `Welcome back! I've unified your accounts. ${mergeResult.total_orders > 0 ? `You now have ${mergeResult.total_orders} orders in your complete history.` : 'Ready to place your first order?'}`;
+          }
+          
+          const response = {
+            customer: {
+              id: unifiedCustomer.id,
+              email: unifiedCustomer.email,
+              phone: unifiedCustomer.phone,
+              firstName: unifiedCustomer.first_name,
+              lastName: unifiedCustomer.last_name,
+              name: [unifiedCustomer.first_name, unifiedCustomer.last_name].filter(Boolean).join(' ') || 'Valued Customer',
+              allergies: unifiedCustomer.allergies || [],
+              dietaryRestrictions: unifiedCustomer.dietary_restrictions || [],
+              isNewAccount: false,
+              accountSources: accountSources,
+              _internalId: unifiedCustomer.id
+            },
+            orderHistory: orders || [],
+            mergeResults: {
+              merged: true,
+              mergeType: mergeResult.merge_type,
+              strategy: mergeResult.merge_strategy || 'consolidation',
+              ordersTransferred: mergeResult.orders_transferred || 0,
+              totalOrders: mergeResult.total_orders || 0,
+              consolidatedAccounts: mergeResult.consolidated_accounts || 1
+            },
+            summary: summaryMessage
+          };
+
+          return new Response(JSON.stringify(response), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Enhanced account merge process error:', error);
+  }
+
+  // Fall back to conflict handling if merge is not possible or failed
   const response = {
     customer: {
       id: accounts[0].id,

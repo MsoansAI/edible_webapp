@@ -1,8 +1,5 @@
 'use client';
 
-import { useUIStore } from '@/store/uiStore';
-import ChatLauncher from '@/components/ChatLauncher';
-import ChatPanel from '@/components/ChatPanel';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Toaster } from 'react-hot-toast';
@@ -12,34 +9,23 @@ interface AppClientLayoutProps {
 }
 
 export default function AppClientLayout({ children }: AppClientLayoutProps) {
-  const { isChatOpen } = useUIStore();
-
   return (
-    <body className="min-h-screen bg-white overflow-x-hidden">
+    <body className="min-h-screen bg-white">
       <Header />
       
-      <div
-        id="main-content-wrapper"
-        className={`min-h-screen flex flex-col transition-all duration-300 ease-in-out \
-          ${isChatOpen ? 'md:mr-[50vw] chat-is-open-and-squeezing' : 'mr-0'}
-        `}
-      >
-        <main className="flex-1 flex flex-col w-full">{children}</main>
-        <Footer />
-      </div>
-
-      <ChatPanel />
-      <ChatLauncher />
+      <main className="flex-1 flex flex-col w-full">
+        {children}
+      </main>
+      
+      <Footer />
 
       <Toaster
-        position="top-right"
+        position="bottom-left"
         toastOptions={{
           duration: 4000,
           style: {
             background: '#fff',
             color: '#374151',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
             fontSize: '14px',
           },
           success: {

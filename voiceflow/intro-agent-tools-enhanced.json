@@ -1,0 +1,162 @@
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "unifyCustomerContext",
+        "description": "Silently identify and unify customer accounts using Enhanced Customer Management V2. Handles phone consolidation, email-phone merge, and duplicate detection without mentioning technical processes to customers.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "phone": {
+              "type": "string",
+              "description": "Customer phone number in E164 format"
+            },
+            "email": {
+              "type": "string", 
+              "description": "Customer email address"
+            },
+            "authUserId": {
+              "type": "string",
+              "description": "Web app authentication ID if available"
+            },
+            "firstName": {
+              "type": "string",
+              "description": "Customer first name if provided"
+            },
+            "lastName": {
+              "type": "string", 
+              "description": "Customer last name if provided"
+            }
+          },
+          "required": []
+        }
+      }
+    },
+    {
+      "type": "function", 
+      "function": {
+        "name": "detectCustomerIntent",
+        "description": "Analyze customer message to determine primary intent for routing. Returns intent category and confidence level.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "customerMessage": {
+              "type": "string",
+              "description": "The customer's original message or inquiry"
+            },
+            "customerTone": {
+              "type": "string",
+              "enum": ["neutral", "frustrated", "urgent", "casual", "polite"],
+              "description": "Detected emotional tone of the customer"
+            }
+          },
+          "required": ["customerMessage"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "routeToSpecialist", 
+        "description": "Route customer to appropriate specialist with unified context package. Generates handoff instructions and context.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "customerId": {
+              "type": "string",
+              "description": "Unified customer ID from customer management system"
+            },
+            "intent": {
+              "type": "string",
+              "enum": ["ordering", "support", "product_info", "general"],
+              "description": "Detected customer intent"
+            },
+            "urgency": {
+              "type": "string", 
+              "enum": ["normal", "high"],
+              "description": "Priority level based on customer tone and request type"
+            },
+            "originalMessage": {
+              "type": "string",
+              "description": "Customer's original message for context"
+            },
+            "additionalContext": {
+              "type": "string",
+              "description": "Any relevant details gathered during conversation"
+            }
+          },
+          "required": ["customerId", "intent", "originalMessage"]
+        }
+      }
+    }
+  ],
+
+  "tool_usage_guidelines": {
+    "conversation_flow": [
+      {
+        "step": 1,
+        "action": "greet_customer",
+        "description": "Provide warm, professional greeting"
+      },
+      {
+        "step": 2, 
+        "action": "unify_customer_silently",
+        "tool": "unifyCustomerContext",
+        "description": "Identify customer and unify accounts behind the scenes"
+      },
+      {
+        "step": 3,
+        "action": "detect_intent",
+        "tool": "detectCustomerIntent", 
+        "description": "Analyze customer message for routing purpose"
+      },
+      {
+        "step": 4,
+        "action": "route_to_specialist",
+        "tool": "routeToSpecialist",
+        "description": "Hand off to appropriate specialist with context"
+      }
+    ],
+
+    "response_principles": {
+      "brevity": "Keep responses to 2-3 sentences maximum",
+      "professionalism": "Warm but efficient tone", 
+      "focus": "Route quickly, don't solve complex issues yourself",
+      "recognition": "Acknowledge returning customers appropriately",
+      "context_preservation": "Ensure specialists have complete customer information"
+    },
+
+    "error_handling": {
+      "unclear_intent": "Ask clarifying question: 'Are you looking to place an order, get support with an existing order, or have questions about our products?'",
+      "frustrated_customer": "Route immediately to support with high urgency",
+      "technical_issues": "Route to support, do not mention technical problems to customer",
+      "multiple_intents": "Route to primary intent (ordering > support > info)"
+    }
+  },
+
+  "greeting_templates": {
+    "new_customer": "Hi! Welcome to Edible Arrangements. I'm here to help you today. What can I do for you?",
+    "returning_customer": "Hi {name}! Welcome back to Edible Arrangements. How can I help you today?",
+    "premium_customer": "Hello {name}! Always a pleasure to see you. What can I help you with today?"
+  },
+
+  "routing_targets": {
+    "ordering": {
+      "specialist": "Ordering Specialist",
+      "context_needed": ["customer_profile", "previous_orders", "preferences", "location"]
+    },
+    "support": {
+      "specialist": "Support Specialist", 
+      "context_needed": ["recent_orders", "account_history", "previous_issues", "urgency_level"]
+    },
+    "product_info": {
+      "specialist": "Product Specialist",
+      "context_needed": ["location", "dietary_restrictions", "occasion", "basic_preferences"]
+    },
+    "general": {
+      "specialist": "Information Specialist",
+      "context_needed": ["location", "basic_preferences"]
+    }
+  }
+} 

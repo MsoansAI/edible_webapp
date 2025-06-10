@@ -87,6 +87,8 @@ interface ChatContext {
   userRole?: string
   lastOrderDate?: string
   preferredDeliveryZip?: string
+  totalOrders?: number
+  userTier?: string
   // Full cart data object
   cartData?: {
     items: any[]
@@ -294,8 +296,8 @@ export const sendMessageWithContext = async (
   message: string,
   additionalContext?: ChatContext
 ): Promise<any[]> => {
-  // Get current authentication state
-  const authContext = getCurrentAuthContext()
+  // Get current authentication state (now async)
+  const authContext = await getCurrentAuthContext()
   
   // Get current cart state with full data
   const cartContext = getCurrentCartContext()
@@ -314,22 +316,64 @@ export const sendMessageWithContext = async (
 }
 
 // Helper functions to get current context (adapt these to your systems)
-function getCurrentAuthContext(): ChatContext {
-  // You'll implement this based on your auth system
-  // For example, if using NextAuth or similar:
+async function getCurrentAuthContext(): Promise<ChatContext> {
   try {
-    // Get from your auth store/context/session
-    const isAuthenticated = checkIfUserIsAuthenticated() // Your auth check
-    const user = getCurrentUser() // Your user getter
+    // Import supabase client
+    const { supabase } = await import('@/lib/supabase')
     
+    // Check current auth session
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error || !session) {
+      return {
+        isAuthenticated: false,
+        userRole: 'guest'
+      }
+    }
+
+    // Get full user profile data from API
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authUserId: session.user.id })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.profile) {
+          const profile = data.profile
+          const orderHistory = data.orderHistory || []
+          
+          return {
+            isAuthenticated: true,
+            userId: session.user.id,
+            userName: profile.name || `${profile.firstName || ''} ${profile.lastName || ''}`.trim(),
+            userEmail: profile.email || session.user.email,
+            userRole: 'authenticated',
+            
+            // Additional profile data for intro agent
+            lastOrderDate: profile.stats?.lastOrderDate,
+            preferredDeliveryZip: profile.preferences?.preferredDeliveryZip,
+            totalOrders: profile.stats?.totalOrders || 0,
+            userTier: profile.tier || 'new'
+          }
+        }
+      }
+    } catch (profileError) {
+      console.warn('Failed to load profile data:', profileError)
+    }
+
+    // Fallback to basic auth data if profile loading fails
     return {
-      isAuthenticated,
-      userId: user?.id,
-      userName: user?.name,
-      userEmail: user?.email,
-      userRole: user?.role || 'authenticated'
+      isAuthenticated: true,
+      userId: session.user.id,
+      userName: session.user.user_metadata?.name || session.user.email?.split('@')[0],
+      userEmail: session.user.email,
+      userRole: 'authenticated'
     }
   } catch (error) {
+    console.error('Error getting auth context:', error)
     return {
       isAuthenticated: false,
       userRole: 'guest'
@@ -397,18 +441,7 @@ function getCurrentCartContext(): ChatContext {
   }
 }
 
-// Placeholder functions - you'll replace these with your actual implementations
-function checkIfUserIsAuthenticated(): boolean {
-  // Replace with your auth check
-  // Example: return !!session?.user
-  return false
-}
-
-function getCurrentUser(): any {
-  // Replace with your user getter
-  // Example: return session?.user
-  return null
-}
+// Placeholder functions removed - now using real Supabase auth integration
 
 // Initial launch action to start or reset a conversation
 export const launchRequest: VoiceflowRequestAction = {

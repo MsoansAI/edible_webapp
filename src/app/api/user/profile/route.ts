@@ -13,6 +13,16 @@ interface ProfileRequest {
   authUserId?: string
 }
 
+interface ProfileUpdateRequest {
+  authUserId: string
+  firstName?: string
+  lastName?: string
+  phone?: string
+  allergies?: string[]
+  dietaryRestrictions?: string[]
+  preferences?: any
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: ProfileRequest = await request.json()
@@ -244,6 +254,132 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: 'server_error',
       message: 'Failed to retrieve user profile'
+    }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body: ProfileUpdateRequest = await request.json()
+    
+    if (!body.authUserId) {
+      return NextResponse.json({
+        error: 'Missing authUserId',
+        message: 'AuthUserId is required for profile updates'
+      }, { status: 400 })
+    }
+
+    // Find the customer record linked to this auth user
+    let { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('id, auth_user_id, email, first_name, last_name, phone')
+      .eq('auth_user_id', body.authUserId)
+      .single()
+
+    if (customerError || !customer) {
+      return NextResponse.json({
+        error: 'customer_not_found',
+        message: 'No customer found linked to this authenticated user'
+      }, { status: 404 })
+    }
+
+    // Build updates object with only provided fields
+    const customerUpdates: any = {}
+    const authUpdates: any = {}
+
+    // Handle basic profile fields
+    if (body.firstName !== undefined) {
+      customerUpdates.first_name = body.firstName.trim()
+      authUpdates.first_name = body.firstName.trim()
+    }
+    
+    if (body.lastName !== undefined) {
+      customerUpdates.last_name = body.lastName.trim()
+      authUpdates.last_name = body.lastName.trim()
+    }
+    
+    if (body.phone !== undefined) {
+      customerUpdates.phone = body.phone.trim()
+      authUpdates.phone = body.phone.trim()
+    }
+
+    // Handle arrays (allergies, dietary restrictions)
+    if (body.allergies !== undefined) {
+      customerUpdates.allergies = body.allergies
+    }
+    
+    if (body.dietaryRestrictions !== undefined) {
+      customerUpdates.dietary_restrictions = body.dietaryRestrictions
+    }
+
+    // Handle preferences
+    if (body.preferences !== undefined) {
+      // Merge with existing preferences
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('preferences')
+        .eq('id', customer.id)
+        .single()
+      
+      const existingPrefs = existingCustomer?.preferences || {}
+      customerUpdates.preferences = { ...existingPrefs, ...body.preferences }
+    }
+
+    // Update customer table
+    const { data: updatedCustomer, error: updateCustomerError } = await supabase
+      .from('customers')
+      .update(customerUpdates)
+      .eq('id', customer.id)
+      .select()
+      .single()
+
+    if (updateCustomerError) {
+      console.error('Error updating customer:', updateCustomerError)
+      return NextResponse.json({
+        error: 'update_failed',
+        message: 'Failed to update customer profile'
+      }, { status: 500 })
+    }
+
+    // Update auth.users metadata if we have auth updates
+    if (Object.keys(authUpdates).length > 0) {
+      const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
+        body.authUserId,
+        {
+          user_metadata: authUpdates
+        }
+      )
+
+      if (authUpdateError) {
+        console.error('Error updating auth user metadata:', authUpdateError)
+        // Don't fail the request if auth update fails, just log it
+      }
+    }
+
+    // Return the updated profile in the same format as the GET request
+    const profile = {
+      id: updatedCustomer.id,
+      name: `${updatedCustomer.first_name || ''} ${updatedCustomer.last_name || ''}`.trim(),
+      firstName: updatedCustomer.first_name,
+      lastName: updatedCustomer.last_name,
+      email: updatedCustomer.email,
+      phone: updatedCustomer.phone,
+      allergies: updatedCustomer.allergies || [],
+      dietaryRestrictions: updatedCustomer.dietary_restrictions || [],
+      preferences: updatedCustomer.preferences || {}
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Profile updated successfully',
+      profile
+    })
+
+  } catch (error) {
+    console.error('Profile update error:', error)
+    return NextResponse.json({
+      error: 'server_error',
+      message: 'An unexpected error occurred'
     }, { status: 500 })
   }
 }
