@@ -93,32 +93,32 @@ export default function Footer() {
     <footer className="bg-gray-900 text-white">
       {/* Newsletter Section */}
       <div className="bg-primary-600">
-        <div className="container-width section-padding py-8">
+        <div className="container-width responsive-padding py-6 sm:py-8">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             <div className="text-center md:text-left">
-              <h3 className="text-xl font-bold text-white mb-2">Stay Fresh with Our Newsletter</h3>
-              <p className="text-primary-100">Get exclusive offers, seasonal recipes, and gifting inspiration delivered to your inbox.</p>
+              <h3 className="text-lg sm:text-xl font-bold text-white mb-2">Stay Fresh with Our Newsletter</h3>
+              <p className="text-sm sm:text-base text-primary-100">Get exclusive offers, seasonal recipes, and gifting inspiration.</p>
             </div>
             <div className="w-full md:w-auto">
-              <form onSubmit={handleNewsletterSubmit} className="flex space-x-2 max-w-md mx-auto md:mx-0">
+              <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 max-w-md mx-auto md:mx-0">
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  className="flex-1 px-4 py-3 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white"
+                  placeholder="Enter your email"
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white text-sm sm:text-base"
                   required
                 />
                 <button
                   type="submit"
-                  className="bg-white text-primary-600 px-6 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors duration-200 flex items-center space-x-2"
+                  className="bg-white text-primary-600 px-4 sm:px-6 py-2 sm:py-3 font-medium hover:bg-gray-100 transition-colors duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base"
                 >
                   <span>Subscribe</span>
-                  <ArrowRightIcon className="h-4 w-4" />
+                  <ArrowRightIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                 </button>
               </form>
               {isNewsletterSubmitted && (
-                <p className="text-primary-100 text-sm mt-2 text-center md:text-left">Thank you for subscribing!</p>
+                <p className="text-primary-100 text-xs sm:text-sm mt-2 text-center md:text-left">Thank you for subscribing!</p>
               )}
             </div>
           </div>

@@ -26,10 +26,10 @@ export default function HomePage() {
             .eq('is_active', true)
             .limit(4),
           supabase
-            .from('products')
-            .select('*')
-            .eq('is_active', true)
-            .limit(8)
+          .from('products')
+          .select('*')
+          .eq('is_active', true)
+          .limit(8)
         ])
 
         if (featuredResponse.error) console.error('Error fetching featured products:', featuredResponse.error)
@@ -95,27 +95,30 @@ export default function HomePage() {
             backgroundSize: '60px 60px'
           }} />
         </div>
-
-        <div className="container-width section-padding relative">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center min-h-[600px] py-12 lg:py-24">
+        
+        <div className="container-width responsive-padding relative">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[500px] sm:min-h-[600px] py-8 sm:py-12 lg:py-24">
             
             {/* Hero Content */}
-            <div className="space-y-8 lg:pr-8">
+            <div className="space-y-6 sm:space-y-8 lg:pr-8">
               
               {/* Trust Badge */}
-              <div className="inline-flex items-center bg-white shadow-clean px-4 py-3 border border-success-200">
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-success-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-semibold text-success-700">Trusted by 1M+ Happy Customers</span>
-                  <div className="flex items-center space-x-1 ml-4">
+              <div className="inline-flex items-center bg-white shadow-clean px-3 sm:px-4 py-2 sm:py-3 border border-success-200">
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="w-2 h-2 sm:w-3 sm:h-3 bg-success-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs sm:text-sm font-semibold text-success-700">
+                    <span className="hidden sm:inline">Trusted by 1M+ Happy Customers</span>
+                    <span className="sm:hidden">1M+ Happy Customers</span>
+                  </span>
+                  <div className="flex items-center space-x-1 ml-2 sm:ml-4">
                     {[...Array(5)].map((_, i) => (
-                      <StarIcon key={i} className="h-4 w-4 text-warning-500 fill-warning-500" />
+                      <StarIcon key={i} className="h-3 w-3 sm:h-4 sm:w-4 text-warning-500 fill-warning-500" />
                     ))}
-                    <span className="text-sm font-medium text-neutral-700 ml-2">4.9/5</span>
+                    <span className="text-xs sm:text-sm font-medium text-neutral-700 ml-1 sm:ml-2">4.9/5</span>
                   </div>
                 </div>
-              </div>
-              
+                </div>
+                
               {/* Main Headline */}
               <div className="space-y-6">
                 <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-neutral-900 leading-[0.9] tracking-tight">
@@ -162,7 +165,7 @@ export default function HomePage() {
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-success-100 flex items-center justify-center">
                     <ShieldCheckIcon className="h-5 w-5 text-success-600" />
-                  </div>
+                    </div>
                   <div>
                     <p className="font-semibold text-neutral-900">Guaranteed</p>
                     <p className="text-sm text-neutral-600">100% satisfaction</p>
@@ -320,14 +323,14 @@ export default function HomePage() {
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                {featuredProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    onAddToCart={handleAddToCart}
-                  />
-                ))}
-              </div>
+              {featuredProducts.map((product) => (
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  onAddToCart={handleAddToCart}
+                />
+              ))}
+            </div>
               
               <div className="text-center mt-12">
                 <Link href="/products" className="btn-secondary">

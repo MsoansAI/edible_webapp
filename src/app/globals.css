@@ -190,6 +190,35 @@
     @apply px-4 sm:px-6;
   }
 
+  /* === RESPONSIVE UTILITIES === */
+  .mobile-spacing {
+    @apply px-2 py-2;
+  }
+  
+  .desktop-spacing {
+    @apply sm:px-4 sm:py-3 lg:px-6 lg:py-4;
+  }
+  
+  .ultra-compact {
+    @apply text-xs sm:text-sm p-1 sm:p-2;
+  }
+  
+  .responsive-padding {
+    @apply px-2 sm:px-4 lg:px-6;
+  }
+  
+  .responsive-margin {
+    @apply mx-2 sm:mx-4 lg:mx-6;
+  }
+
+  .mobile-text {
+    @apply text-xs sm:text-sm;
+  }
+  
+  .desktop-text {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+
   /* === LOADING STATES === */
   .skeleton {
     @apply animate-pulse bg-neutral-200;
@@ -224,6 +253,19 @@
 
   .animate-float {
     animation: float 3s ease-in-out infinite;
+  }
+
+  /* === CHAT ASSISTANT UTILITIES === */
+  .chat-widget-enter {
+    animation: chatSlideIn 0.3s ease-out;
+  }
+
+  .chat-widget-exit {
+    animation: chatSlideOut 0.2s ease-in;
+  }
+
+  .chat-pulse {
+    animation: chatPulse 2s ease-in-out infinite;
   }
 
   .safe-area-pb {
@@ -311,6 +353,40 @@
   }
   50% {
     transform: translateY(-10px);
+  }
+}
+
+/* === CHAT ASSISTANT ANIMATIONS === */
+@keyframes chatSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes chatSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+}
+
+@keyframes chatPulse {
+  0%, 100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
   }
 }
 

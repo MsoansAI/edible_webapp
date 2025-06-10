@@ -142,8 +142,27 @@ export default function CartPage() {
               const isUpdatingThis = isUpdating === itemKey
 
               return (
-                <div key={itemKey} className="cart-item">
-                  <div className="flex items-start gap-6">
+                <div key={itemKey} className="cart-item relative">
+                  {/* Remove Button - Fixed Position Top Right at cart item level (n-2) */}
+                  <button
+                    onClick={() => handleRemoveItem(item.product.id, item.option?.id)}
+                    className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 rounded z-10"
+                    aria-label="Remove item"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+
+                  {/* Price Display - Fixed Position at cart item level (n-2) */}
+                  <div className="absolute bottom-4 right-4 text-right z-5">
+                    <p className="product-price-small mb-1">
+                      ${(price * item.quantity).toFixed(2)}
+                    </p>
+                    <p className="text-small text-neutral-500">
+                      ${price.toFixed(2)} each
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-6 pr-32 pb-20">
                     
                     {/* Product Image */}
                     <div className="w-24 h-24 bg-neutral-50 overflow-hidden flex-shrink-0">
@@ -164,81 +183,61 @@ export default function CartPage() {
 
                     {/* Product Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="heading-card mb-2">
-                            <Link 
-                              href={`/products/${item.product.product_identifier}`}
-                              className="hover:text-primary-600 transition-colors duration-200"
-                            >
-                              {item.product.name}
-                            </Link>
-                          </h3>
-                          
-                          {item.option && (
-                            <p className="text-small text-neutral-600 mb-1">
-                              Size: {item.option.option_name}
-                            </p>
-                          )}
-                          
-                          <div className="flex items-center gap-3 text-small text-neutral-500">
-                            <span>ID: {item.product.product_identifier}</span>
-                            <span className="flex items-center">
-                              <span className="w-2 h-2 bg-success-500 mr-1"></span>
-                              Fresh guaranteed
-                            </span>
-                          </div>
-                        </div>
+                      {/* Product Info */}
+                      <div className="mb-4">
+                        <h3 className="heading-card mb-2">
+                          <Link 
+                            href={`/products/${item.product.product_identifier}`}
+                            className="hover:text-primary-600 transition-colors duration-200"
+                          >
+                            {item.product.name}
+                          </Link>
+                        </h3>
                         
-                        <button
-                          onClick={() => handleRemoveItem(item.product.id, item.option?.id)}
-                          className="p-2 text-neutral-400 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50"
-                          aria-label="Remove item"
-                        >
-                          <TrashIcon className="h-5 w-5" />
-                        </button>
+                        {item.option && (
+                          <p className="text-small text-neutral-600 mb-1">
+                            Size: {item.option.option_name}
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center gap-3 text-small text-neutral-500">
+                          <span>ID: {item.product.product_identifier}</span>
+                          <span className="flex items-center">
+                            <span className="w-2 h-2 bg-success-500 mr-1"></span>
+                            Fresh guaranteed
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Quantity and Price */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <span className="text-small text-neutral-600 font-medium">Quantity:</span>
-                          <div className="quantity-selector">
-                            <button
-                              onClick={() => handleQuantityChange(item.product.id, item.option?.id, item.quantity - 1)}
-                              disabled={isUpdatingThis || item.quantity <= 1}
-                              className="quantity-btn"
-                              aria-label="Decrease quantity"
-                            >
-                              <MinusIcon className="h-4 w-4" />
-                            </button>
-                            
-                            <span className="px-4 py-2 text-center min-w-[3rem] font-semibold border-x border-neutral-300">
-                              {isUpdatingThis ? (
-                                <div className="loading-spinner mx-auto"></div>
-                              ) : (
-                                item.quantity
-                              )}
-                            </span>
-                            
-                            <button
-                              onClick={() => handleQuantityChange(item.product.id, item.option?.id, item.quantity + 1)}
-                              disabled={isUpdatingThis}
-                              className="quantity-btn"
-                              aria-label="Increase quantity"
-                            >
-                              <PlusIcon className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="text-right">
-                          <p className="product-price-small mb-1">
-                            ${(price * item.quantity).toFixed(2)}
-                          </p>
-                          <p className="text-small text-neutral-500">
-                            ${price.toFixed(2)} each
-                          </p>
+                      {/* Quantity Controls */}
+                      <div className="flex items-center gap-4">
+                        <span className="text-small text-neutral-600 font-medium">Quantity:</span>
+                        <div className="quantity-selector">
+                          <button
+                            onClick={() => handleQuantityChange(item.product.id, item.option?.id, item.quantity - 1)}
+                            disabled={isUpdatingThis || item.quantity <= 1}
+                            className="quantity-btn"
+                            aria-label="Decrease quantity"
+                          >
+                            <MinusIcon className="h-4 w-4" />
+                          </button>
+                          
+                          <span className="px-4 py-2 text-center min-w-[3rem] font-semibold border-x border-neutral-300">
+                            {isUpdatingThis ? (
+                              <div className="loading-spinner mx-auto"></div>
+                            ) : (
+                              item.quantity
+                            )}
+                          </span>
+                          
+                          <button
+                            onClick={() => handleQuantityChange(item.product.id, item.option?.id, item.quantity + 1)}
+                            disabled={isUpdatingThis}
+                            className="quantity-btn"
+                            aria-label="Increase quantity"
+                          >
+                            <PlusIcon className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     </div>

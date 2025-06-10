@@ -3,6 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
+import { 
+  ShieldCheckIcon,
+  CreditCardIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  PhoneIcon
+} from '@heroicons/react/24/outline';
 
 interface OrderItem {
   productId: string;
@@ -49,7 +58,6 @@ export default function PaymentPage() {
 
   const fetchOrderDetails = async () => {
     try {
-      // This would call your edge function to get order details by payment token
       const response = await fetch(`/api/payments/details?token=${token}`);
       
       if (!response.ok) {
@@ -74,7 +82,6 @@ export default function PaymentPage() {
     setPaymentProcessing(true);
     
     try {
-      // This would integrate with Square or your payment processor
       const paymentResponse = await fetch('/api/payments/process', {
         method: 'POST',
         headers: {
@@ -94,8 +101,6 @@ export default function PaymentPage() {
       }
       
       const result = await paymentResponse.json();
-      
-      // Redirect to success page
       window.location.href = `/order/confirmation/${result.paymentId}`;
       
     } catch (err) {
@@ -106,13 +111,13 @@ export default function PaymentPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 flex items-center justify-center">
+      <div className="min-h-screen gradient-neutral flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center animate-pulse">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          <div className="w-16 h-16 mx-auto mb-6 bg-primary-600 rounded-2xl flex items-center justify-center">
+            <div className="loading-spinner"></div>
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Loading Your Order</h3>
-          <p className="text-slate-600">Retrieving your payment details...</p>
+          <h3 className="heading-card mb-3">Loading Your Order</h3>
+          <p className="text-body">Retrieving your payment details...</p>
         </div>
       </div>
     );
@@ -120,18 +125,16 @@ export default function PaymentPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+      <div className="min-h-screen gradient-neutral flex items-center justify-center section-padding">
+        <div className="max-w-md mx-auto card p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-6 bg-red-50 rounded-full flex items-center justify-center">
+            <XCircleIcon className="w-8 h-8 text-red-600" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Payment Link Issue</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <h2 className="heading-card mb-4 text-red-900">Payment Link Issue</h2>
+          <p className="text-body mb-6">{error}</p>
           <button
             onClick={() => window.location.href = '/'}
-            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors"
+            className="btn-primary w-full"
           >
             Return to Home
           </button>
@@ -143,171 +146,210 @@ export default function PaymentPage() {
   if (!orderDetails) return null;
 
   const isExpired = new Date(orderDetails.expiresAt) < new Date();
+  const expiryDate = new Date(orderDetails.expiresAt);
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Simple Header - Just the essentials */}
-      <div className="text-center py-8 border-b border-gray-200">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Complete Your Payment</h1>
-        <p className="text-lg text-gray-600">Order #{orderDetails.orderNumber}</p>
-        {!isExpired && (
-          <p className="text-sm text-green-600 mt-2">
-            ✓ Secure payment • Expires {new Date(orderDetails.expiresAt).toLocaleDateString()} at {new Date(orderDetails.expiresAt).toLocaleTimeString()}
-          </p>
-        )}
-        {isExpired && (
-          <div className="mt-4 p-4 bg-red-50 rounded-lg max-w-md mx-auto">
-            <p className="text-red-800 font-medium">⚠️ Payment Link Expired</p>
-            <p className="text-red-600 text-sm mt-1">Please call 1-800-EDIBLE for help</p>
+    <div className="min-h-screen bg-neutral-50">
+      {/* Header */}
+      <div className="bg-white border-b border-neutral-200">
+        <div className="container-width section-padding py-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="flex items-center justify-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-primary-600 rounded-xl flex items-center justify-center">
+                <CreditCardIcon className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="heading-section">Complete Your Payment</h1>
+              </div>
+            </div>
+            
+            <p className="text-large mb-4">
+              Order <span className="font-semibold text-primary-600">#{orderDetails.orderNumber}</span>
+            </p>
+            
+            {!isExpired ? (
+              <div className="inline-flex items-center space-x-2 px-4 py-2 bg-success-50 border border-success-200 rounded-full">
+                <ShieldCheckIcon className="h-5 w-5 text-success-600" />
+                <span className="text-small font-medium text-success-700">
+                  Secure Payment • Expires {expiryDate.toLocaleDateString()} at {expiryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center space-x-2 px-4 py-2 bg-red-50 border border-red-200 rounded-full">
+                <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+                <span className="text-small font-medium text-red-700">Payment Link Expired</span>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Responsive Layout - Simple on mobile, two columns on desktop */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="lg:grid lg:grid-cols-3 lg:gap-8 space-y-8 lg:space-y-0">
-          
-          {/* Left Column - Product Info (Mobile: stacked, Desktop: 2/3 width) */}
-          <div className="lg:col-span-2 space-y-6">
+      <div className="container-width section-padding py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            {/* What You're Buying - With Real Images */}
-            <div className="bg-blue-50 rounded-lg p-6 border-2 border-blue-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center lg:text-left">🍓 What You're Buying</h2>
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
               
-              {orderDetails.items.map((item, index) => (
-                <div key={index} className="bg-white rounded-lg p-6 mb-4 border-2 border-gray-300">
-                  <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
-                    
-                    {/* Product Image */}
-                    <div className="flex-shrink-0">
-                      <div className="w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden">
-                        {item.productImage ? (
-                          <Image
-                            src={item.productImage}
-                            alt={item.productName}
-                            width={128}
-                            height={128}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              target.nextElementSibling?.classList.remove('hidden');
-                            }}
-                          />
-                        ) : null}
-                        <div className={`w-full h-full bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center ${item.productImage ? 'hidden' : ''}`}>
-                          <div className="text-center">
-                            <div className="text-4xl mb-2">🍓</div>
-                            <div className="text-sm text-red-600 font-medium">Premium Gift</div>
+              {/* Order Items */}
+              <div className="card p-6">
+                <h2 className="heading-card mb-6">Your Order</h2>
+                
+                <div className="space-y-4">
+                  {orderDetails.items.map((item, index) => (
+                    <div key={index} className="flex items-start space-x-4 p-4 bg-neutral-50 rounded-lg border border-neutral-100">
+                      <div className="flex-shrink-0">
+                        <div className="w-20 h-20 bg-neutral-200 rounded-lg overflow-hidden">
+                          {item.productImage ? (
+                            <Image
+                              src={item.productImage}
+                              alt={item.productName}
+                              width={80}
+                              height={80}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <div className={`w-full h-full bg-primary-50 flex items-center justify-center ${item.productImage ? 'hidden' : ''}`}>
+                            <span className="text-2xl">🍓</span>
                           </div>
                         </div>
                       </div>
-                    </div>
-                    
-                    {/* Product Details */}
-                    <div className="flex-1 text-center sm:text-left">
-                      <h3 className="text-xl lg:text-2xl font-bold text-gray-900 mb-2">{item.productName}</h3>
-                      <p className="text-gray-600 mb-4">{item.productDescription || "Premium fresh fruit arrangement"}</p>
                       
-                      <div className="space-y-2">
-                        <p className="text-lg text-gray-700">Quantity: <span className="font-bold">{item.quantity}</span></p>
-                        <p className="text-2xl lg:text-3xl font-bold text-green-600">${item.totalPrice.toFixed(2)}</p>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-neutral-900 mb-1">{item.productName}</h3>
+                        <p className="text-small text-neutral-600 mb-2 line-clamp-2">
+                          {item.productDescription || "Premium fresh fruit arrangement"}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-small text-neutral-500">Qty: {item.quantity}</span>
+                          <span className="product-price-small">${item.totalPrice.toFixed(2)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
 
-            {/* Customer Info - Desktop Only */}
-            <div className="hidden lg:block bg-yellow-50 rounded-lg p-6 border-2 border-yellow-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">👤 Customer Information</h2>
-              <div className="bg-white rounded-lg p-6 border-2 border-gray-300">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-lg">
+              {/* Customer & Delivery Info */}
+              <div className="card p-6">
+                <h2 className="heading-card mb-6">Delivery Details</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <p><span className="font-bold">Name:</span> {orderDetails.customerName}</p>
-                    <p><span className="font-bold">Phone:</span> {orderDetails.customerPhone}</p>
-                    <p><span className="font-bold">Email:</span> {orderDetails.customerEmail}</p>
+                    <h3 className="font-medium text-neutral-900 mb-3">Customer Information</h3>
+                    <div className="space-y-2 text-body">
+                      <p><span className="text-neutral-500">Name:</span> {orderDetails.customerName}</p>
+                      <p><span className="text-neutral-500">Email:</span> {orderDetails.customerEmail}</p>
+                      <p><span className="text-neutral-500">Phone:</span> {orderDetails.customerPhone}</p>
+                    </div>
                   </div>
+                  
                   {orderDetails.delivery && (
                     <div>
-                      <p><span className="font-bold">Delivery To:</span> {orderDetails.delivery.recipientName}</p>
-                      <p><span className="font-bold">Address:</span><br/>{orderDetails.delivery.address}</p>
-                      <p><span className="font-bold">When:</span> {orderDetails.delivery.scheduledDate}</p>
+                      <h3 className="font-medium text-neutral-900 mb-3">Delivery Information</h3>
+                      <div className="space-y-2 text-body">
+                        <p><span className="text-neutral-500">Recipient:</span> {orderDetails.delivery.recipientName}</p>
+                        <p><span className="text-neutral-500">Address:</span><br className="md:hidden" /> {orderDetails.delivery.address}</p>
+                        <p><span className="text-neutral-500">Scheduled:</span> {orderDetails.delivery.scheduledDate}</p>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Right Column - Payment Info (Mobile: stacked, Desktop: 1/3 width) */}
-          <div className="lg:col-span-1 space-y-6">
-            
-            {/* Customer Info - Mobile Only */}
-            <div className="lg:hidden bg-yellow-50 rounded-lg p-6 border-2 border-yellow-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">👤 Customer Information</h2>
-              <div className="bg-white rounded-lg p-6 border-2 border-gray-300">
-                <div className="space-y-4 text-xl">
-                  <p><span className="font-bold">Name:</span> {orderDetails.customerName}</p>
-                  <p><span className="font-bold">Phone:</span> {orderDetails.customerPhone}</p>
-                  <p><span className="font-bold">Email:</span> {orderDetails.customerEmail}</p>
-                  {orderDetails.delivery && (
-                    <>
-                      <p><span className="font-bold">Delivery To:</span> {orderDetails.delivery.recipientName}</p>
-                      <p><span className="font-bold">Address:</span><br/>{orderDetails.delivery.address}</p>
-                      <p><span className="font-bold">When:</span> {orderDetails.delivery.scheduledDate}</p>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Total Cost - Sticky on Desktop */}
-            <div className="bg-green-50 rounded-lg p-6 border-2 border-green-200 lg:sticky lg:top-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center lg:text-left">💰 Total To Pay</h2>
-              <div className="bg-white rounded-lg p-6 border-2 border-gray-300 text-center">
-                <p className="text-4xl lg:text-5xl font-bold text-green-600 mb-2">${orderDetails.totalAmount.toFixed(2)}</p>
-                <p className="text-lg text-gray-600 mb-6">Total (including tax and delivery)</p>
+            {/* Payment Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="card p-6 lg:sticky lg:top-8">
+                <h2 className="heading-card mb-6">Payment Summary</h2>
                 
-                {/* Pay Button */}
+                <div className="space-y-4 mb-6">
+                  <div className="flex justify-between text-body">
+                    <span>Subtotal</span>
+                    <span>${(orderDetails.totalAmount * 0.92).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-body">
+                    <span>Tax & Fees</span>
+                    <span>${(orderDetails.totalAmount * 0.08).toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-neutral-200 pt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-neutral-900 text-lg">Total</span>
+                      <span className="product-price text-primary-600">${orderDetails.totalAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
                 {!isExpired ? (
-                  <div>
+                  <div className="space-y-4">
                     <button
                       onClick={handlePayment}
                       disabled={paymentProcessing}
-                      className="bg-green-600 hover:bg-green-700 text-white font-bold py-6 lg:py-8 px-8 lg:px-16 rounded-lg text-2xl lg:text-3xl transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                      className="btn-primary w-full btn-large flex items-center justify-center space-x-2"
                     >
                       {paymentProcessing ? (
-                        "Processing..."
+                        <>
+                          <div className="loading-spinner"></div>
+                          <span>Processing...</span>
+                        </>
                       ) : (
-                        "🔒 PAY NOW"
+                        <>
+                          <ShieldCheckIcon className="h-5 w-5" />
+                          <span>Complete Payment</span>
+                        </>
                       )}
                     </button>
                     
-                    <div className="mt-4 space-y-2">
-                      <p className="text-lg lg:text-xl text-gray-600">
-                        ✓ Safe & Secure Payment
-                      </p>
-                      <p className="text-sm lg:text-base text-gray-500">
-                        Powered by Square • Same security as your bank
+                    <div className="text-center space-y-2">
+                      <div className="flex items-center justify-center space-x-2 text-success-600">
+                        <CheckCircleIcon className="h-4 w-4" />
+                        <span className="text-small font-medium">Secure SSL Encrypted</span>
+                      </div>
+                      <p className="text-small text-neutral-500">
+                        Protected by industry-standard security
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <div className="bg-red-50 rounded-lg p-4 border-2 border-red-200 mb-4">
-                      <p className="text-xl font-bold text-red-800 mb-1">⚠️ Payment Link Expired</p>
-                      <p className="text-lg text-red-600">Please call us for help</p>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+                      <ExclamationTriangleIcon className="h-8 w-8 text-red-600 mx-auto mb-2" />
+                      <p className="font-medium text-red-800 mb-1">Payment Link Expired</p>
+                      <p className="text-small text-red-600">Please contact us for assistance</p>
                     </div>
+                    
                     <a 
                       href="tel:+1-800-EDIBLE"
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-colors inline-block w-full"
+                      className="btn-secondary w-full flex items-center justify-center space-x-2"
                     >
-                      📞 Call 1-800-EDIBLE
+                      <PhoneIcon className="h-5 w-5" />
+                      <span>Call 1-800-EDIBLE</span>
                     </a>
                   </div>
                 )}
+
+                {/* Trust Signals */}
+                <div className="mt-6 pt-6 border-t border-neutral-200">
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="space-y-2">
+                      <div className="w-8 h-8 bg-success-50 rounded-full flex items-center justify-center mx-auto">
+                        <CheckCircleIcon className="h-5 w-5 text-success-600" />
+                      </div>
+                      <p className="text-small text-neutral-600">Same-Day Delivery</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="w-8 h-8 bg-primary-50 rounded-full flex items-center justify-center mx-auto">
+                        <ShieldCheckIcon className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <p className="text-small text-neutral-600">Satisfaction Guaranteed</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

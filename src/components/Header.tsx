@@ -55,12 +55,13 @@ export default function Header() {
     <header className="bg-white border-b border-neutral-200 sticky top-0 z-50">
       {/* Trust Bar */}
       <div className="bg-primary-600 text-white">
-        <div className="container-width section-padding">
-          <div className="flex items-center justify-center py-3 text-sm font-medium">
-            <div className="flex items-center space-x-6">
+        <div className="container-width responsive-padding">
+          <div className="flex items-center justify-center py-3 mobile-text font-medium">
+            <div className="flex items-center space-x-3 sm:space-x-6">
               <div className="flex items-center">
-                <TruckIcon className="h-4 w-4 mr-2" />
-                <span>Free delivery on orders over $65</span>
+                <TruckIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden xs:inline sm:inline">Free delivery on orders over $65</span>
+                <span className="xs:hidden">Free $65+</span>
               </div>
               <div className="hidden sm:flex items-center">
                 <PhoneIcon className="h-4 w-4 mr-2" />
@@ -72,17 +73,20 @@ export default function Header() {
       </div>
 
       {/* Main Header */}
-      <div className="container-width section-padding">
-        <div className="flex items-center justify-between h-20">
+      <div className="container-width responsive-padding">
+        <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center group">
-              <div className="w-12 h-12 bg-primary-600 flex items-center justify-center mr-4 transition-colors group-hover:bg-primary-700">
-                <span className="text-white font-bold text-xl">E</span>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-600 flex items-center justify-center mr-2 sm:mr-4 transition-colors group-hover:bg-primary-700">
+                <span className="text-white font-bold text-lg sm:text-xl">E</span>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-neutral-900">Edible Arrangements</h1>
-                <p className="text-sm text-neutral-500 font-medium">Premium Gifts & Fresh Fruit</p>
+              <div className="hidden sm:block">
+                <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Edible Arrangements</h1>
+                <p className="text-xs sm:text-sm text-neutral-500 font-medium">Premium Gifts & Fresh Fruit</p>
+              </div>
+              <div className="block sm:hidden">
+                <h1 className="text-lg font-bold text-neutral-900">Edible</h1>
               </div>
             </Link>
           </div>
@@ -101,34 +105,34 @@ export default function Header() {
           </nav>
 
           {/* Right Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-1 sm:space-x-2 lg:space-x-4">
             {/* Search */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="p-3 text-neutral-700 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 touch-target"
+              className="p-2 sm:p-3 text-neutral-700 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 touch-target"
               aria-label="Search products"
             >
-              <MagnifyingGlassIcon className="h-6 w-6" />
+              <MagnifyingGlassIcon className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
 
             {/* Account */}
             <button
               onClick={handleAccountClick}
-              className="p-3 text-neutral-700 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 touch-target"
+              className="p-2 sm:p-3 text-neutral-700 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 touch-target"
               aria-label={isAuthenticated ? "My Account" : "Sign In"}
             >
-              <UserIcon className="h-6 w-6" />
+              <UserIcon className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
 
             {/* Cart */}
             <Link
               href="/cart"
-              className="relative p-3 text-neutral-700 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 touch-target"
+              className="relative p-2 sm:p-3 text-neutral-700 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 touch-target"
               aria-label={`Shopping cart with ${itemCount} items`}
             >
-              <ShoppingCartIcon className="h-6 w-6" />
+              <ShoppingCartIcon className="h-5 w-5 sm:h-6 sm:w-6" />
               {isMounted && itemCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs font-bold h-6 w-6 flex items-center justify-center min-w-[24px] px-1">
+                <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs font-bold h-5 w-5 sm:h-6 sm:w-6 flex items-center justify-center min-w-[20px] sm:min-w-[24px] px-1">
                   {itemCount > 99 ? '99+' : itemCount}
                 </span>
               )}
@@ -137,13 +141,13 @@ export default function Header() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden p-3 text-neutral-700 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 touch-target"
+              className="lg:hidden p-2 sm:p-3 text-neutral-700 hover:text-primary-600 transition-colors duration-200 hover:bg-neutral-50 touch-target"
               aria-label="Menu"
             >
               {isMobileMenuOpen ? (
-                <XMarkIcon className="h-6 w-6" />
+                <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" />
               ) : (
-                <Bars3Icon className="h-6 w-6" />
+                <Bars3Icon className="h-5 w-5 sm:h-6 sm:w-6" />
               )}
             </button>
           </div>

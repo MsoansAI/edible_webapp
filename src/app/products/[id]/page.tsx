@@ -422,45 +422,45 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Mobile Sticky Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 z-40 safe-area-pb">
-        <div className="container-width section-padding py-4">
-          <div className="flex items-center justify-between space-x-4">
-            {/* Quantity & Price Summary */}
-            <div className="flex items-center space-x-4">
-              <div className="quantity-selector">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="quantity-btn"
-                  disabled={quantity <= 1}
-                  aria-label="Decrease quantity"
-                >
-                  <MinusIcon className="h-4 w-4" />
-                </button>
-                <span className="px-4 py-2 text-center min-w-[3rem] font-semibold border-x border-neutral-300">
-                  {quantity}
-                </span>
-                <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="quantity-btn"
-                  aria-label="Increase quantity"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-neutral-600">Total</p>
-                <p className="text-xl font-bold text-neutral-900">${totalPrice.toFixed(2)}</p>
-              </div>
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 z-40 safe-area-pb overflow-hidden">
+        <div className="max-w-full px-2 sm:px-4 py-2 sm:py-3">
+          <div className="flex items-center justify-between gap-1 sm:gap-2 max-w-full">
+            {/* Quantity Selector - Ultra Compact */}
+            <div className="flex items-center border border-neutral-300 bg-white flex-shrink-0">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 transition-colors duration-200 focus:outline-none"
+                disabled={quantity <= 1}
+                aria-label="Decrease quantity"
+              >
+                <MinusIcon className="h-3 w-3" />
+              </button>
+              <span className="px-1 py-1 sm:px-2 sm:py-1 text-center w-6 sm:w-8 font-semibold border-x border-neutral-300 text-xs sm:text-sm">
+                {quantity}
+              </span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 transition-colors duration-200 focus:outline-none"
+                aria-label="Increase quantity"
+              >
+                <PlusIcon className="h-3 w-3" />
+              </button>
             </div>
 
-            {/* Action Button */}
+            {/* Price Display - Compact */}
+            <div className="text-center flex-shrink-0">
+              <p className="text-xs text-neutral-600 leading-none hidden sm:block">Total</p>
+              <p className="text-sm sm:text-base font-bold text-neutral-900 leading-none">${totalPrice.toFixed(2)}</p>
+            </div>
+
+            {/* Action Button - Flexible */}
             <button
               onClick={handleAddToCart}
               disabled={isAddingToCart}
-              className="btn-primary flex-1 max-w-[200px] py-3 px-6"
+              className="bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 flex-1 min-w-[70px] max-w-[100px] sm:max-w-[140px] py-2 sm:py-2.5 px-1 sm:px-3 text-xs sm:text-sm"
             >
               {isAddingToCart ? (
-                <div className="loading-spinner mx-auto"></div>
+                <div className="loading-spinner mx-auto w-4 h-4"></div>
               ) : (
                 'Add to Cart'
               )}
@@ -472,14 +472,7 @@ export default function ProductDetailPage() {
       {/* Mobile Bottom Padding */}
       <div className="h-20"></div>
 
-      {/* Floating Chat Button */}
-      <button
-        className="fixed right-6 w-14 h-14 bg-primary-600 hover:bg-primary-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50 bottom-24"
-        aria-label="Open chat support"
-        onClick={() => toast.success('Chat feature coming soon!')}
-      >
-        <ChatBubbleLeftRightIcon className="h-6 w-6" />
-      </button>
+      {/* Note: Floating Chat Button is now handled by the enhanced FloatingChatButton component in AppClientLayout */}
     </div>
   )
 } 

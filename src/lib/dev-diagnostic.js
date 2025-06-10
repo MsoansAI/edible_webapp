@@ -385,17 +385,38 @@ export class DevEnvironmentDiagnostic {
       const startTime = Date.now()
       const supabase = createClient(supabaseUrl, supabaseAnonKey)
       
-      // Simple connection test
+      // Test basic connection
       const { data, error } = await supabase.from('products').select('count').limit(1)
       const latency = Date.now() - startTime
+
+      if (error) {
+        return {
+          connected: false,
+          error: error.message,
+          projectId: supabaseUrl.split('//')[1]?.split('.')[0],
+          latency,
+          recommendation: 'Check RLS policies and table permissions'
+        }
+      }
+
+      // Test product data availability for troubleshooting
+      const { data: testProduct, error: productError } = await supabase
+        .from('products')
+        .select('product_identifier, name, is_active')
+        .eq('is_active', true)
+        .limit(1)
 
       const projectId = supabaseUrl.split('//')[1]?.split('.')[0]
 
       return {
-        connected: !error,
+        connected: true,
         latency,
         projectId,
-        error: error?.message || null
+        error: null,
+        productDataAvailable: !productError && testProduct,
+        sampleProductId: testProduct ? testProduct.product_identifier : null,
+        recommendation: (!testProduct || productError) ? 
+          'Products table appears empty or inaccessible. Check data and RLS policies.' : null
       }
     } catch (error) {
       return {

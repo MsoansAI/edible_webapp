@@ -219,9 +219,15 @@ export const handleVoiceflowAction = async (action: VoiceflowCustomAction): Prom
 /**
  * Processes an array of Voiceflow traces to handle custom actions.
  * It identifies custom action traces and calls the appropriate handler.
+ * Choice traces are left unprocessed so they can be handled by the ChatWidget.
  */
 export const processVoiceflowTraces = async (traces: VoiceflowTrace[]): Promise<VoiceflowTrace[]> => {
   for (const trace of traces) {
+    // Skip choice traces - let ChatWidget handle them
+    if (trace.type === 'choice') {
+      continue;
+    }
+
     let actionToHandle: VoiceflowCustomAction | null = null;
 
     // This handles the structure we've seen: { type: "clear-cart", payload: { type: "custom", ... } }

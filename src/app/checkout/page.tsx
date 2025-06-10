@@ -206,7 +206,7 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-
+      
       <div className="container-width section-padding py-8">
         <div className="max-w-6xl mx-auto">
           <form onSubmit={handleSubmit}>
@@ -559,7 +559,7 @@ export default function CheckoutPage() {
                               <span className="font-semibold text-neutral-900 text-sm">
                                 ${(price * item.quantity).toFixed(2)}
                               </span>
-                            </div>
+                          </div>
                           </div>
                         </div>
                       )
@@ -615,24 +615,24 @@ export default function CheckoutPage() {
                     <div className="flex items-center text-small text-neutral-600">
                       <ShieldCheckIcon className="h-4 w-4 text-success-600 mr-3 flex-shrink-0" />
                       <span>256-bit SSL secure checkout</span>
-                    </div>
+                  </div>
                     
                     <div className="flex items-center text-small text-neutral-600">
                       <TruckIcon className="h-4 w-4 text-success-600 mr-3 flex-shrink-0" />
                       <span>Same-day delivery available</span>
-                    </div>
-                    
+              </div>
+
                     <div className="flex items-center text-small text-neutral-600">
                       <HeartIcon className="h-4 w-4 text-success-600 mr-3 flex-shrink-0" />
                       <span>100% satisfaction guarantee</span>
-                    </div>
-                    
+                </div>
+
                     <div className="flex items-center text-small text-neutral-600">
                       <StarIcon className="h-4 w-4 text-success-600 mr-3 flex-shrink-0" />
                       <span>4.9/5 customer rating</span>
-                    </div>
                   </div>
-                  
+                </div>
+
                   {/* Support */}
                   <div className="mt-6 p-4 bg-neutral-50 border border-neutral-200">
                     <h4 className="font-medium text-neutral-900 mb-2">Need Help?</h4>

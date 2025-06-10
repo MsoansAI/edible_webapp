@@ -93,7 +93,7 @@ export default function ProductCard({ product, onAddToCart, className = '' }: Pr
         </div>
 
         {/* Product Info */}
-        <div className="p-6 space-y-4">
+        <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4">
           
           {/* Rating */}
           <div className="flex items-center justify-between">
@@ -101,25 +101,25 @@ export default function ProductCard({ product, onAddToCart, className = '' }: Pr
               {[...Array(5)].map((_, i) => (
                 <StarIcon
                   key={i}
-                  className={`h-4 w-4 ${
+                  className={`h-3 w-3 sm:h-4 sm:w-4 ${
                     i < 4 ? 'text-warning-500 fill-current' : 'text-neutral-300'
                   }`}
                 />
               ))}
-              <span className="text-small ml-2">(4.8)</span>
+              <span className="text-xs sm:text-sm ml-1 sm:ml-2 text-neutral-600">(4.8)</span>
             </div>
-            <div className="badge-success">
+            <div className="badge-success text-xs sm:text-sm">
               Same Day
             </div>
           </div>
 
           {/* Product Name */}
           <div>
-            <h3 className="heading-card line-clamp-2 group-hover:text-primary-600 transition-colors duration-200">
+            <h3 className="text-sm sm:text-base lg:text-lg font-semibold line-clamp-2 group-hover:text-primary-600 transition-colors duration-200">
               {product.name}
             </h3>
             {product.description && (
-              <p className="text-small line-clamp-2 mt-2">
+              <p className="text-xs sm:text-sm text-neutral-500 line-clamp-2 mt-1 sm:mt-2">
                 {product.description}
               </p>
             )}
@@ -128,20 +128,22 @@ export default function ProductCard({ product, onAddToCart, className = '' }: Pr
           {/* Price */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <span className="product-price-small">
+              <span className="text-base sm:text-lg font-semibold text-neutral-900">
                 {formatPrice(product.base_price)}
               </span>
             </div>
           </div>
 
           {/* Trust Indicators */}
-          <div className="pt-4 border-t border-neutral-100">
-            <div className="flex items-center justify-between text-small text-neutral-500">
+          <div className="pt-3 sm:pt-4 border-t border-neutral-100">
+            <div className="flex items-center justify-between text-xs sm:text-sm text-neutral-500">
               <span className="flex items-center">
-                <span className="w-2 h-2 bg-success-500 mr-2"></span>
-                Fresh Guaranteed
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-success-500 mr-1 sm:mr-2"></span>
+                <span className="hidden sm:inline">Fresh Guaranteed</span>
+                <span className="sm:hidden">Fresh</span>
               </span>
-              <span>Free delivery $65+</span>
+              <span className="hidden sm:inline">Free delivery $65+</span>
+              <span className="sm:hidden">Free $65+</span>
             </div>
           </div>
 
