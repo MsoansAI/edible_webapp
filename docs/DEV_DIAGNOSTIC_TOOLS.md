@@ -213,6 +213,24 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
+#### Prerender Error with Missing Dependencies
+If you encounter "Cannot find module 'critters'" or similar errors during build:
+
+```bash
+# Install the missing dependency for CSS optimization
+npm install --save-dev critters
+
+# Or if you don't need CSS optimization, disable it in next.config.js
+# experimental: {
+#   optimizeCss: false,
+# }
+```
+
+**Common conditional dependencies:**
+- `critters` - Required for `experimental.optimizeCss: true`
+- `@next/mdx` - Required for `experimental.mdxRs: true`
+- `@vercel/analytics` - Required for Vercel analytics integration
+
 #### TypeScript Errors
 ```bash
 # Check types

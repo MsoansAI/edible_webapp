@@ -172,6 +172,24 @@ async function runFullDiagnostic() {
       console.log(`   ${COLORS.success('Installed:')} ${report.details.dependencies.installed.length}`)
       if (report.details.dependencies.missing.length > 0) {
         console.log(`   ${COLORS.error('Missing:')} ${report.details.dependencies.missing.length}`)
+        
+        // Show conditional dependencies separately
+        const conditionalMissing = report.details.dependencies.missing.filter(d => d.type === 'conditional')
+        const regularMissing = report.details.dependencies.missing.filter(d => d.type !== 'conditional')
+        
+        if (conditionalMissing.length > 0) {
+          console.log(`   ${COLORS.warning('Conditional Dependencies Missing:')}`)
+          conditionalMissing.forEach(dep => {
+            console.log(`     ${COLORS.warning('●')} ${dep.name}: ${dep.reason}`)
+          })
+        }
+        
+        if (regularMissing.length > 0) {
+          console.log(`   ${COLORS.error('Required Dependencies Missing:')}`)
+          regularMissing.forEach(dep => {
+            console.log(`     ${COLORS.error('●')} ${dep.name}`)
+          })
+        }
       }
     }
 

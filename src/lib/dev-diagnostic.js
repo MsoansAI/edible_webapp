@@ -132,10 +132,15 @@ export class DevEnvironmentDiagnostic {
         }
       }
 
+      // Check for conditional dependencies based on Next.js config
+      const conditionalDeps = await this._checkConditionalDependencies()
+      missing.push(...conditionalDeps)
+
       return {
         installed,
         missing,
         outdated,
+        conditionalDependencies: conditionalDeps,
         totalDependencies: Object.keys(allDependencies).length
       }
     } catch (error) {
@@ -143,9 +148,56 @@ export class DevEnvironmentDiagnostic {
         installed: [],
         missing: [],
         outdated: [],
+        conditionalDependencies: [],
         error: error.message
       }
     }
+  }
+
+  async _checkConditionalDependencies() {
+    const missing = []
+    
+    try {
+      // Check Next.js config for features that require additional dependencies
+      const nextConfigExists = await this._fileExists('next.config.js')
+      if (nextConfigExists) {
+        const configContent = await fs.readFile('next.config.js', 'utf8')
+        
+        // Check for CSS optimization
+        if (configContent.includes('optimizeCss: true')) {
+          const packageJson = await this._readJsonFile('package.json')
+          const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies }
+          
+          if (!allDeps.critters) {
+            missing.push({
+              name: 'critters',
+              version: '^0.0.16',
+              reason: 'Required for optimizeCss experimental feature in next.config.js',
+              type: 'conditional'
+            })
+          }
+        }
+
+        // Check for other experimental features that might need dependencies
+        if (configContent.includes('mdxRs: true')) {
+          const packageJson = await this._readJsonFile('package.json')
+          const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies }
+          
+          if (!allDeps['@next/mdx']) {
+            missing.push({
+              name: '@next/mdx',
+              version: 'latest',
+              reason: 'Required for MDX Rust compiler',
+              type: 'conditional'
+            })
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore errors in conditional dependency checking
+    }
+
+    return missing
   }
 
   async checkSecurityVulnerabilities() {
