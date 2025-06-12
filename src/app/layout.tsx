@@ -18,9 +18,11 @@ const playfair = Playfair_Display({
 
 // Metadata export is allowed in Server Components
 export const metadata: Metadata = {
-  title: 'Edible Arrangements - Premium Gifts & Fresh Fruit Arrangements',
-  description: 'Send the perfect gift with Edible Arrangements. Fresh fruit arrangements, chocolate-covered strawberries, and gourmet treats delivered nationwide.',
-  keywords: 'fruit arrangements, chocolate strawberries, gifts, edible arrangements, fresh fruit',
+  title: 'Edible Arrangements - Voice Agent Demo',
+  description: 'A real-time demonstration of the AI-powered customer service agent for franchisees.',
+  icons: {
+    icon: 'https://jfjvqylmjzprnztbfhpa.supabase.co/storage/v1/object/public/assets//faviconnew.ico',
+  },
 }
 
 export default function RootLayout({

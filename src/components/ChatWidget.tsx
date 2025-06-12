@@ -20,9 +20,11 @@ import {
   interact,
   generateUserId,
   launchRequest,
-  sendMessageWithFullContext,
+  createTextRequest,
   VoiceflowTrace,
-  VoiceflowRequestAction
+  VoiceflowRequestAction,
+  saveTranscript,
+  sendMessageWithFullContext
 } from '@/lib/voiceflow';
 import { processVoiceflowTraces } from '@/lib/voiceflowActions';
 
@@ -192,7 +194,7 @@ const CompactProductDisplay: React.FC<{
 };
 
 export default function ChatWidget() {
-  const { isChatOpen, closeChat } = useUIStore();
+  const { isChatOpen, toggleChat, closeChat } = useUIStore();
   const { items, getTotal } = useCartStore();
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -227,6 +229,7 @@ export default function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const isInitializing = useRef(false);
+  const [cartVersion, setCartVersion] = useState(0); // For triggering re-renders when cart changes
 
   // Check if we're on a product page
   const isProductPage = pathname?.includes('/products/');
@@ -429,54 +432,93 @@ export default function ChatWidget() {
 
   // Enhanced trace processing from ChatPanel
   const processTraces = async (traces: VoiceflowTrace[]) => {
-    // Clear any "loading..." messages
-    setMessages(prevMessages => prevMessages.filter(m => m.type !== 'loading'));
+    console.log('Processing traces:', traces);
     
-    // Let the dedicated action handler process all traces first
+    // First, process custom actions
     const processedTraces = await processVoiceflowTraces(traces as any);
-
-    // Loop through and display the remaining, unprocessed visual traces
-    for (const trace of processedTraces) {
-      // Skip traces that the action handler already took care of
-      if (trace.processed) {
-        continue;
-      }
-
+    
+    // Filter out processed custom action traces for UI rendering
+    const uiTraces = processedTraces.filter(trace => !trace.processed);
+    
+    for (const trace of uiTraces) {
+      console.log('Processing UI trace:', trace.type, trace.payload);
+      
       switch (trace.type) {
         case 'text':
         case 'speak':
           if (trace.payload?.message) {
-            addMessage({ sender: 'assistant', type: 'text', content: trace.payload.message });
+            addMessage({
+              content: trace.payload.message,
+              sender: 'assistant',
+              type: 'text'
+            });
           }
           break;
-        
-        case 'carousel':
-          const carouselData = trace.payload as CarouselData;
-          if (carouselData?.cards?.length > 0) {
-            addMessage({ sender: 'assistant', type: 'carousel', payload: { carouselData } });
-          }
-          break;
-
+          
         case 'choice':
-          if (trace.payload?.buttons?.length > 0) {
-            addMessage({ sender: 'assistant', type: 'buttons', payload: { buttons: trace.payload.buttons } });
+          if (trace.payload?.buttons && trace.payload.buttons.length > 0) {
+            // Convert Voiceflow buttons to our choice format
+            const choices = trace.payload.buttons.map((button: any) => ({
+              name: button.name,
+              request: button.request
+            }));
+            
+            addMessage({
+              content: '',
+              sender: 'assistant',
+              type: 'choice',
+              choices
+            });
           }
           break;
-
-        case 'end':
-          setIsLoading(false);
-          return; // End processing
-
-        case 'error':
-          const errorMessage = trace.payload?.message || 'An error occurred communicating with the assistant.';
-          addMessage({ sender: 'system', type: 'error', content: errorMessage, payload: { details: trace.payload?.details } });
+          
+        case 'buttons':
+          if (trace.payload?.buttons && trace.payload.buttons.length > 0) {
+            addMessage({
+              content: '',
+              sender: 'assistant',
+              type: 'buttons',
+              payload: {
+                buttons: trace.payload.buttons
+              }
+            });
+          }
           break;
+          
+        case 'carousel':
+          if (trace.payload) {
+            let carouselData: CarouselData;
+            
+            if (trace.payload.cards) {
+              carouselData = trace.payload;
+            } else if (trace.payload.carousel) {
+              carouselData = trace.payload.carousel;
+            } else {
+              console.warn('Invalid carousel payload:', trace.payload);
+              continue;
+            }
+            
+            addMessage({
+              content: '',
+              sender: 'assistant',
+              type: 'carousel',
+              payload: {
+                carouselData
+              }
+            });
+          }
+          break;
+          
+        case 'end':
+          console.log('Conversation ended');
+          break;
+          
+        default:
+          console.log('Unhandled trace type:', trace.type);
       }
     }
-
-    // Final UI updates
-    setIsLoading(false);
-    setTimeout(scrollToBottom, 100);
+    
+    scrollToBottom();
   };
 
   const addMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>): ChatMessage => {
@@ -608,6 +650,20 @@ export default function ChatWidget() {
     handleSendMessage(inputValue.trim());
     setInputValue('');
   };
+
+  // Add cart update event listener
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      console.log('Cart update event received, forcing re-render.');
+      setCartVersion(prevVersion => prevVersion + 1);
+    };
+
+    window.addEventListener('cart-updated', handleCartUpdate);
+
+    return () => {
+      window.removeEventListener('cart-updated', handleCartUpdate);
+    };
+  }, []);
 
   if (!isChatOpen) return null;
 

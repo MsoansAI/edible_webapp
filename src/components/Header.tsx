@@ -7,6 +7,7 @@ import { ShoppingCartIcon, UserIcon, MagnifyingGlassIcon, Bars3Icon, XMarkIcon, 
 import { useCartStore } from '@/store/cartStore'
 import { supabase } from '@/lib/supabase'
 import SearchBar from './SearchBar'
+import Image from 'next/image'
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -77,17 +78,14 @@ export default function Header() {
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-600 flex items-center justify-center mr-2 sm:mr-4 transition-colors group-hover:bg-primary-700">
-                <span className="text-white font-bold text-lg sm:text-xl">E</span>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Edible Arrangements</h1>
-                <p className="text-xs sm:text-sm text-neutral-500 font-medium">Premium Gifts & Fresh Fruit</p>
-              </div>
-              <div className="block sm:hidden">
-                <h1 className="text-lg font-bold text-neutral-900">Edible</h1>
-              </div>
+            <Link href="/">
+              <Image
+                className="block h-12 w-auto"
+                src="https://jfjvqylmjzprnztbfhpa.supabase.co/storage/v1/object/public/assets//Logo.png"
+                alt="Edible Arrangements"
+                width={180}
+                height={48}
+              />
             </Link>
           </div>
 
