@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AgentConfig, VapiMessage } from '@/types/voice-agent';
-import { callData } from '@/lib/vapi-call-data';
+import { callData } from './vapi-call-data';
 import PostCallAnalysisCard from './PostCallAnalysisCard';
 import { 
   PhoneIcon, UserIcon, CpuChipIcon, CheckCircleIcon, PlayIcon, PauseIcon, 

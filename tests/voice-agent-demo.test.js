@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import LiveSimulation from '@/components/voice-agent-demo/LiveSimulation';
-import { callData } from '@/lib/vapi-call-data'; // Mock data
+import { callData } from '@/components/voice-agent-demo/vapi-call-data';
 
 // Mock the AgentConfig props
 const mockConfig = {
