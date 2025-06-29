@@ -13,6 +13,64 @@
 
 ---
 
+## 📊 Complete Git Commit Timeline
+
+### Project Genesis (June 2025)
+
+#### **June 4, 2025 - Initial Foundation**
+**Git Commits**:
+- `e38e2ec` - Add root page component
+- `3ede5cb` - Create homepage components and layout  
+- `65d7447` - Create product components and update homepage
+- `66a8918` - Add @supabase/ssr dependency
+- `515aa46` - Add environment variable validation for Supabase client
+- `ca398e9` - Configure Next.js image domains
+- `3e9334b` - Improve website styling and design
+- `e4325a8` - Set up Next.js project with Tailwind CSS
+
+#### **June 3-4, 2025 - AI Agent Integration & Architecture**
+**Git Commits**:
+- `4985e21` - Enhance AI Agent Integration and Edge Functions Guides with detailed order item management features
+- `c1bf7bf` - Update .gitignore and comprehensive documentation overhaul
+- `29fbbc6` - Add dynamic carousel functionality for product options integration
+- `8ffd0e7` - Add comprehensive test suite for Voiceflow LLM Agent Integration
+
+#### **June 7, 2025 - Cart Architecture & Custom Actions**
+**Git Commits**:
+- `12c5ad7` - Add Voiceflow Cart Architecture documentation and implement custom actions for cart management
+- `c1e1c73` - Implement migration to custom actions architecture for cart and checkout management
+- `41a2591` - Add comprehensive documentation for chatbot cart and checkout integration
+
+#### **June 8, 2025 - Testing & Documentation Enhancement**
+**Git Commits**:
+- `666e66b` - Add Jest configuration and setup files for testing environment
+- `156bce7` - Remove outdated documentation files (major cleanup)
+- `56a5f4b` - Add useEffect to redirect to cart if no items are present in checkout
+- `dde2fb8` - Update project documentation and enhance API guides
+- `733f374` - Enhance EDGE_FUNCTIONS_GUIDE and API functionality for store validation
+- `ae835cb` - Enhance API documentation and functionality for cart and customer management
+
+#### **June 9-10, 2025 - Feature Enhancement & Optimization**
+**Git Commits**:
+- `6190848` - Update dependencies, enhance payment link functionality, and improve documentation
+- `403b7f0` - Enhance configuration and improve product management features
+- `9ddd2a4` - Update README.md
+- `1f14348` - Add critters dependency for CSS optimization and enhance diagnostic tools
+- `4586d52` - Enhance chat functionality and improve responsive design
+
+#### **June 12, 2025 - Voice Agent Demo Implementation**
+**Git Commits**:
+- `30f473f` - Add framer-motion for animations and implement voice agent demo components
+- `3d7ebba` - Update import paths for callData in LiveSimulation component and test file
+- `c930f38` - Update import path for callData in LiveSimulation component
+- `2f78dd1` - Add files via upload
+
+#### **June 29, 2025 - Analysis, Rebuild & Documentation**
+**Git Commits**:
+- `f5b3584` - Add comprehensive changelog for Voice Agent Demo Project
+
+---
+
 ## 🏗️ Project Genesis & Foundation
 
 ### Initial Architecture (Pre-Timeline)
@@ -33,9 +91,15 @@ The project began as a Next.js-based food delivery webapp with basic voice integ
 
 ## 📅 Timeline of Major Changes
 
-### Phase 1: Foundation & Analysis (January 2025)
+### Phase 1: Foundation & Analysis (June 2025)
 
-#### 🔍 **January 26, 2025 - Project Audit & Component Analysis**
+#### 🔍 **June 12, 2025 - Voice Agent Demo Implementation**
+**Git Commits**:
+- `30f473f` - Add framer-motion for animations and implement voice agent demo components
+- `3d7ebba` - Update import paths for callData in LiveSimulation component and test file  
+- `c930f38` - Update import path for callData in LiveSimulation component
+
+#### 🔍 **June 29, 2025 - Project Audit & Component Analysis**
 
 **Context**: Need to understand and improve the voice agent demo capabilities
 
@@ -66,7 +130,7 @@ The project began as a Next.js-based food delivery webapp with basic voice integ
 
 **Key Discovery**: LiveSimulation had superior notification architecture that needed to be replicated in LiveCall.
 
-#### 🧹 **January 26, 2025 - Workspace Cleanup**
+#### 🧹 **June 29, 2025 - Workspace Cleanup**
 
 **Files Removed**:
 - `test_debug_search.py` - Legacy debug script
@@ -79,9 +143,9 @@ The project began as a Next.js-based food delivery webapp with basic voice integ
 
 ---
 
-### Phase 2: Complete LiveCall Rebuild (January 2025)
+### Phase 2: Complete LiveCall Rebuild (June 2025)
 
-#### 🚀 **January 26, 2025 - LiveCall Component Complete Rebuild**
+#### 🚀 **June 29, 2025 - LiveCall Component Complete Rebuild**
 
 **Decision**: Complete rewrite from scratch based on analysis findings
 
@@ -128,7 +192,7 @@ The project began as a Next.js-based food delivery webapp with basic voice integ
 - ✅ User-friendly tool call descriptions
 - ✅ Structured message processing pipeline
 
-#### 🧪 **January 26, 2025 - Comprehensive Test Suite Creation**
+#### 🧪 **June 29, 2025 - Comprehensive Test Suite Creation**
 
 **Test Coverage Added**:
 - Component initialization and teardown
@@ -147,9 +211,11 @@ The project began as a Next.js-based food delivery webapp with basic voice integ
 
 ---
 
-### Phase 3: Documentation & Knowledge Capture (January 2025)
+### Phase 3: Documentation & Knowledge Capture (June 2025)
 
-#### 📚 **January 26, 2025 - Technical Documentation Creation**
+#### 📚 **June 29, 2025 - Technical Documentation Creation**
+**Git Commits**:
+- `f5b3584` - Add comprehensive changelog for Voice Agent Demo Project
 
 **Documentation Added**:
 - `docs/VAPI_LIVE_CALL_SETUP.md` - Complete setup guide
