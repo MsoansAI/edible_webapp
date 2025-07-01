@@ -27,7 +27,7 @@ describe('Footer Component', () => {
 
   it('displays newsletter signup section', () => {
     expect(screen.getByText('Stay Fresh with Our Newsletter')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Enter your email address')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Enter your email')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /subscribe/i })).toBeInTheDocument()
   })
 
@@ -86,7 +86,7 @@ describe('Footer Component', () => {
   })
 
   it('handles newsletter form submission', () => {
-    const emailInput = screen.getByPlaceholderText('Enter your email address')
+    const emailInput = screen.getByPlaceholderText('Enter your email')
     const subscribeButton = screen.getByRole('button', { name: /subscribe/i })
 
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } })

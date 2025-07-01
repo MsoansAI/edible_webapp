@@ -158,7 +158,7 @@ const LiveSimulation: React.FC<LiveSimulationProps> = ({ config, isSimulationRun
   }, [isSimulationRunning, config.scenario]);
 
   useEffect(() => {
-    if (transcriptContainerRef.current) {
+    if (transcriptContainerRef.current && typeof transcriptContainerRef.current.scroll === 'function') {
       transcriptContainerRef.current.scroll({
         top: transcriptContainerRef.current.scrollHeight,
         behavior: 'smooth'
@@ -167,7 +167,7 @@ const LiveSimulation: React.FC<LiveSimulationProps> = ({ config, isSimulationRun
   }, [transcript]);
 
   useEffect(() => {
-    if (systemLogsContainerRef.current) {
+    if (systemLogsContainerRef.current && typeof systemLogsContainerRef.current.scroll === 'function') {
       systemLogsContainerRef.current.scroll({
         top: systemLogsContainerRef.current.scrollHeight,
         behavior: 'smooth'
@@ -225,7 +225,7 @@ const LiveSimulation: React.FC<LiveSimulationProps> = ({ config, isSimulationRun
   
   return (
     <div className="bg-white border border-neutral-200 shadow-clean p-6 rounded-lg h-full flex flex-col">
-      <audio ref={audioRef} src={callData.recordingUrl} onEnded={handleAudioEnd} />
+      <audio ref={audioRef} data-testid="audio-player" src={callData.recordingUrl} onEnded={handleAudioEnd} />
       
       <header className="flex justify-between items-center border-b border-neutral-200 pb-4 flex-shrink-0">
         <h2 className="text-2xl font-semibold text-neutral-800">Live Simulation</h2>
