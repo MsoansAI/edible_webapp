@@ -277,6 +277,133 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Categories Section */}
+      <section className="section-spacing bg-neutral-50">
+        <div className="container-width section-padding">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center bg-primary-100 px-4 py-2 text-sm font-semibold text-primary-700 mb-6">
+              Perfect For Every Occasion
+            </div>
+            <h2 className="heading-section mb-6">
+              Shop by
+              <span className="block text-primary-600">Category</span>
+            </h2>
+            <p className="text-large max-w-3xl mx-auto">
+              From birthday celebrations to sympathy gifts, find the perfect arrangement for any moment that matters.
+            </p>
+          </div>
+          
+          {/* Popular Occasions */}
+          <div className="mb-16">
+            <h3 className="text-xl font-semibold text-center mb-8 text-neutral-700">Popular Occasions</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+              {[
+                { name: 'Birthday', icon: '🎂', link: '/products?category=Birthday' },
+                { name: 'Congratulations', icon: '🎉', link: '/products?category=Congratulations' },
+                { name: 'Get Well', icon: '💐', link: '/products?category=Get Well' },
+                { name: 'Graduation', icon: '🎓', link: '/products?category=Graduation' },
+                { name: 'New Baby', icon: '👶', link: '/products?category=New Baby' },
+                { name: 'Sympathy', icon: '🤍', link: '/products?category=Sympathy' }
+              ].map((category, index) => (
+                <Link
+                  key={index}
+                  href={category.link}
+                  className="group bg-white rounded-lg shadow-sm border border-neutral-200 hover:shadow-md transition-all duration-200 p-6 text-center hover:border-primary-300"
+                >
+                  <div className="text-3xl mb-3 group-hover:scale-110 transition-transform duration-200">
+                    {category.icon}
+                  </div>
+                  <h4 className="font-semibold text-neutral-800 group-hover:text-primary-600 transition-colors">
+                    {category.name}
+                  </h4>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Product Types */}
+          <div className="mb-16">
+            <h3 className="text-xl font-semibold text-center mb-8 text-neutral-700">Popular Product Types</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { 
+                  name: 'Fresh Fruits', 
+                  description: 'Premium fresh fruit arrangements',
+                  image: 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp',
+                  link: '/products?category=Fresh Fruits'
+                },
+                { 
+                  name: 'Chocolate Dipped', 
+                  description: 'Decadent chocolate-dipped treats',
+                  image: 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp',
+                  link: '/products?category=Chocolate Dipped Fruit'
+                },
+                { 
+                  name: 'Gift Sets', 
+                  description: 'Curated gift collections',
+                  image: 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp',
+                  link: '/products?category=Gift Sets'
+                },
+                { 
+                  name: 'Edible Bakeshop', 
+                  description: 'Baked goods and sweet treats',
+                  image: 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp',
+                  link: '/products?category=Edible Bakeshop'
+                }
+              ].map((category, index) => (
+                <Link
+                  key={index}
+                  href={category.link}
+                  className="group bg-white rounded-lg shadow-sm border border-neutral-200 hover:shadow-md transition-all duration-200 overflow-hidden"
+                >
+                  <div className="aspect-square relative overflow-hidden">
+                    <Image
+                      src={category.image}
+                      alt={category.name}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-300"></div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+                      <h4 className="font-semibold text-white text-lg">
+                        {category.name}
+                      </h4>
+                      <p className="text-white/90 text-sm">
+                        {category.description}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Special Dietary Options */}
+          <div className="text-center">
+            <h3 className="text-xl font-semibold mb-8 text-neutral-700">Dietary Options</h3>
+            <div className="flex flex-wrap justify-center gap-4">
+              {[
+                { name: 'Nut-Free', icon: '🚫🥜', link: '/products?category=Nut-Free' },
+                { name: 'Vegan-Friendly', icon: '🌱', link: '/products?category=Vegan-Friendly' }
+              ].map((option, index) => (
+                <Link
+                  key={index}
+                  href={option.link}
+                  className="inline-flex items-center bg-white rounded-full px-6 py-3 shadow-sm border border-neutral-200 hover:shadow-md transition-all duration-200 hover:border-success-300 group"
+                >
+                  <span className="text-lg mr-3 group-hover:scale-110 transition-transform duration-200">
+                    {option.icon}
+                  </span>
+                  <span className="font-semibold text-neutral-800 group-hover:text-success-600">
+                    {option.name}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Trust Indicators */}
       <section className="py-16 bg-white">
         <div className="container-width section-padding">

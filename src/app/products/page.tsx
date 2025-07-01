@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useEffect, useState, useCallback, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { FunnelIcon, Squares2X2Icon, ListBulletIcon, ChevronDownIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline'
 import { Product, Category } from '@/types/database'
@@ -21,36 +21,68 @@ function ProductsContent() {
   const [sortBy, setSortBy] = useState('featured')
   const searchParams = useSearchParams()
   const { addItem } = useCartStore()
+  const productsHeaderRef = useRef<HTMLDivElement>(null)
   
   const PRODUCTS_PER_PAGE = 12
 
   const fetchProducts = useCallback(async () => {
     setIsLoading(true)
     try {
+      // Get category filter first
+      const categoryFilter = searchParams.get('category')
+      let productIds: string[] = []
+      
+      // If category filter is applied, get product IDs for that category
+      if (categoryFilter) {
+        try {
+          // Get category ID
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('name', categoryFilter)
+            .single()
+          
+          if (categoryError || !categoryData) {
+            console.warn(`Category "${categoryFilter}" not found`)
+          } else {
+            // Get product IDs in this category
+            const { data: productCategoryData, error: productCategoryError } = await supabase
+              .from('product_categories')
+              .select('product_id')
+              .eq('category_id', categoryData.id)
+            
+            if (productCategoryError) {
+              console.error('Error fetching product categories:', productCategoryError)
+            } else {
+              productIds = productCategoryData?.map(pc => pc.product_id) || []
+            }
+          }
+        } catch (error) {
+          console.error('Error in category filtering:', error)
+        }
+      }
+
+      // Build main products query
       let query = supabase
         .from('products')
         .select('*', { count: 'exact' })
         .eq('is_active', true)
 
+      // Apply category filter if we have product IDs
+      if (categoryFilter && productIds.length > 0) {
+        query = query.in('id', productIds)
+      } else if (categoryFilter && productIds.length === 0) {
+        // Category exists but has no products - return empty result
+        setProducts([])
+        setTotalCount(0)
+        setIsLoading(false)
+        return
+      }
+
       // Apply search filter
       const searchQuery = searchParams.get('search')
       if (searchQuery) {
-        query = query.ilike('name', `%${searchQuery}%`)
-      }
-
-      // Apply category filter
-      const categoryFilter = searchParams.get('category')
-      if (categoryFilter) {
-        const categoryKeywords = {
-          'arrangements': 'arrangement',
-          'chocolate': 'chocolate',
-          'occasion': 'birthday|anniversary|valentine|mother',
-        }
-        
-        const keyword = categoryKeywords[categoryFilter as keyof typeof categoryKeywords]
-        if (keyword) {
-          query = query.ilike('name', `%${keyword}%`)
-        }
+        query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
       }
 
       // Apply price range filter
@@ -78,7 +110,8 @@ function ProductsContent() {
           query = query.order('name', { ascending: false })
           break
         default:
-          query = query.order('name')
+          // For featured, we can order by a combination of factors
+          query = query.order('created_at', { ascending: false })
       }
 
       // Apply pagination
@@ -107,6 +140,7 @@ function ProductsContent() {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .order('type')
         .order('name')
 
       if (error) {
@@ -127,6 +161,16 @@ function ProductsContent() {
     fetchCategories()
   }, [fetchCategories])
 
+  // Reset page when search params change (except page)
+  useEffect(() => {
+    const page = searchParams.get('page')
+    if (page) {
+      setCurrentPage(parseInt(page))
+    } else {
+      setCurrentPage(1)
+    }
+  }, [searchParams])
+
   const totalPages = Math.ceil(totalCount / PRODUCTS_PER_PAGE)
   const searchQuery = searchParams.get('search')
   const categoryFilter = searchParams.get('category')
@@ -144,11 +188,30 @@ function ProductsContent() {
     { value: 'name-desc', label: 'Name: Z to A' },
   ]
 
+  const handlePageChange = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (page > 1) {
+      params.set('page', page.toString())
+    } else {
+      params.delete('page')
+    }
+    window.history.pushState({}, '', `/products?${params.toString()}`)
+    setCurrentPage(page)
+    
+    // Scroll to top of products section
+    if (productsHeaderRef.current) {
+      productsHeaderRef.current.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50">
       
       {/* Header Banner */}
-      <div className="bg-white border-b border-neutral-200">
+      <div ref={productsHeaderRef} className="bg-white border-b border-neutral-200">
         <div className="container-width section-padding section-spacing">
           
           {/* Breadcrumb */}
@@ -160,7 +223,7 @@ function ProductsContent() {
               {categoryFilter && (
                 <>
                   <span>/</span>
-                  <span className="capitalize text-neutral-900">{categoryFilter}</span>
+                  <span className="text-neutral-900 font-medium">{categoryFilter}</span>
                 </>
               )}
             </div>
@@ -171,20 +234,20 @@ function ProductsContent() {
             <div>
               <h1 className="heading-section mb-4">
                 {searchQuery ? `Search Results` : 
-                 categoryFilter ? `${categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)} Collection` : 
+                 categoryFilter ? `${categoryFilter} Collection` : 
                  'All Products'}
               </h1>
               {searchQuery && (
                 <p className="text-large mb-4">
-                  Results for <span className="font-semibold">"{searchQuery}"</span>
+                  Results for <span className="font-semibold text-primary-600">"{searchQuery}"</span>
                 </p>
               )}
               <div className="flex items-center gap-4 text-small">
                 <span className="font-medium">
-                  {totalCount} {totalCount === 1 ? 'product' : 'products'} found
+                  {isLoading ? 'Loading...' : `${totalCount} ${totalCount === 1 ? 'product' : 'products'} found`}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-success-500"></span>
+                  <span className="w-2 h-2 bg-success-500 rounded-full"></span>
                   <span>Free delivery on orders $65+</span>
                 </div>
               </div>
@@ -197,183 +260,176 @@ function ProductsContent() {
             >
               <FunnelIcon className="h-5 w-5 mr-2" />
               Filters & Sort
+              {(searchParams.get('category') || searchParams.get('minPrice') || searchParams.get('maxPrice')) && (
+                <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                  Active
+                </span>
+              )}
             </button>
           </div>
         </div>
       </div>
 
       <div className="container-width section-padding py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className="flex flex-col lg:flex-row gap-8">
           
-          {/* Filters Sidebar */}
-          <div className={`lg:block ${showFilters ? 'block' : 'hidden'}`}>
-            <div className="bg-white card p-6 lg:sticky lg:top-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="heading-card">Filters</h3>
-                <button
-                  onClick={() => setShowFilters(false)}
-                  className="lg:hidden btn-ghost btn-small"
-                >
-                  Done
-                </button>
-              </div>
-              <ProductFilters categories={categories} />
+          {/* Sidebar Filters - Desktop */}
+          <div className="hidden lg:block w-80 flex-shrink-0">
+            <div className="sticky top-24">
+              <ProductFilters categories={categories} totalCount={totalCount} />
             </div>
           </div>
+          
+          {/* Mobile Filters Overlay */}
+          {showFilters && (
+            <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50" onClick={() => setShowFilters(false)}>
+              <div className="absolute right-0 top-0 h-full w-80 bg-white overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-semibold">Filters</h2>
+                    <button
+                      onClick={() => setShowFilters(false)}
+                      className="p-2 hover:bg-neutral-100 rounded-lg"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <ProductFilters categories={categories} totalCount={totalCount} />
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* Products Section */}
-          <div className="lg:col-span-4">
+          {/* Main Content */}
+          <div className="flex-1">
             
             {/* Toolbar */}
-            <div className="bg-white card p-6 mb-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                
-                {/* Sort & View Options */}
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <AdjustmentsHorizontalIcon className="h-5 w-5 text-neutral-400" />
-                    <select 
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="input-field text-sm min-w-[180px]"
-                    >
-                      {sortOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  {/* View Mode Toggle */}
-                  <div className="hidden sm:flex items-center border border-neutral-200">
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`p-2 transition-colors ${
-                        viewMode === 'grid' 
-                          ? 'bg-primary-600 text-white' 
-                          : 'text-neutral-600 hover:bg-neutral-50'
-                      }`}
-                    >
-                      <Squares2X2Icon className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className={`p-2 transition-colors ${
-                        viewMode === 'list' 
-                          ? 'bg-primary-600 text-white' 
-                          : 'text-neutral-600 hover:bg-neutral-50'
-                      }`}
-                    >
-                      <ListBulletIcon className="h-4 w-4" />
-                    </button>
-                  </div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <div className="flex items-center gap-4">
+                {/* View Mode Toggle */}
+                <div className="flex items-center bg-white border border-neutral-200 rounded-lg p-1">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-2 rounded ${viewMode === 'grid' ? 'bg-primary-100 text-primary-600' : 'text-neutral-400'}`}
+                  >
+                    <Squares2X2Icon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`p-2 rounded ${viewMode === 'list' ? 'bg-primary-100 text-primary-600' : 'text-neutral-400'}`}
+                  >
+                    <ListBulletIcon className="h-4 w-4" />
+                  </button>
                 </div>
                 
-                {/* Results Count & Pagination Info */}
-                <div className="text-small text-neutral-500">
-                  Showing {((currentPage - 1) * PRODUCTS_PER_PAGE) + 1}-{Math.min(currentPage * PRODUCTS_PER_PAGE, totalCount)} of {totalCount}
-                </div>
+                <span className="text-sm text-neutral-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="appearance-none bg-white border border-neutral-200 rounded-lg px-4 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
               </div>
             </div>
 
             {/* Products Grid/List */}
             {isLoading ? (
-              <div className={`grid gap-6 ${
-                viewMode === 'grid' 
-                  ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' 
-                  : 'grid-cols-1'
-              }`}>
-                {[...Array(PRODUCTS_PER_PAGE)].map((_, index) => (
-                  <div key={index} className="card p-6 space-y-4">
-                    <div className="skeleton aspect-square"></div>
-                    <div className="skeleton h-6 w-3/4"></div>
-                    <div className="skeleton h-4 w-1/2"></div>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                <div className="skeleton h-8 w-48"></div>
+                <div className={viewMode === 'grid' 
+                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                  : "space-y-4"
+                }>
+                  {[...Array(PRODUCTS_PER_PAGE)].map((_, i) => (
+                    <div key={i} className="skeleton aspect-square"></div>
+                  ))}
+                </div>
               </div>
-            ) : products.length > 0 ? (
+            ) : products.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="text-6xl mb-4">🔍</div>
+                <h3 className="text-xl font-semibold text-neutral-900 mb-2">No products found</h3>
+                <p className="text-neutral-600 mb-6">
+                  Try adjusting your filters or search terms to find what you're looking for.
+                </p>
+                <button
+                  onClick={() => {
+                    window.history.pushState({}, '', '/products')
+                    window.location.reload()
+                  }}
+                  className="btn-primary"
+                >
+                  View All Products
+                </button>
+              </div>
+            ) : (
               <>
-                <div className={`grid gap-6 ${
-                  viewMode === 'grid' 
-                    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' 
-                    : 'grid-cols-1'
-                }`}>
+                <div className={viewMode === 'grid' 
+                  ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"
+                  : "space-y-6 mb-12"
+                }>
                   {products.map((product) => (
                     <ProductCard 
                       key={product.id} 
                       product={product} 
                       onAddToCart={handleAddToCart}
-                      className={viewMode === 'list' ? 'flex flex-row' : ''}
+                      viewMode={viewMode}
                     />
                   ))}
                 </div>
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex justify-center mt-12">
-                    <nav className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                        disabled={currentPage === 1}
-                        className="btn-ghost btn-small disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Previous
-                      </button>
+                  <div className="flex items-center justify-center space-x-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="btn-secondary btn-small disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    
+                    {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                      const pageNum = Math.max(1, currentPage - 2) + i
+                      if (pageNum > totalPages) return null
                       
-                      {[...Array(Math.min(5, totalPages))].map((_, index) => {
-                        const pageNumber = Math.max(1, currentPage - 2) + index
-                        if (pageNumber > totalPages) return null
-                        
-                        return (
-                          <button
-                            key={pageNumber}
-                            onClick={() => setCurrentPage(pageNumber)}
-                            className={`btn-small ${
-                              pageNumber === currentPage
-                                ? 'btn-primary'
-                                : 'btn-ghost'
-                            }`}
-                          >
-                            {pageNumber}
-                          </button>
-                        )
-                      })}
-                      
-                      <button
-                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                        disabled={currentPage === totalPages}
-                        className="btn-ghost btn-small disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
-                    </nav>
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`btn-small ${
+                            pageNum === currentPage 
+                              ? 'btn-primary' 
+                              : 'btn-secondary'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                    
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="btn-secondary btn-small disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
                   </div>
                 )}
               </>
-            ) : (
-              <div className="text-center py-16">
-                <div className="bg-white card p-12 max-w-md mx-auto">
-                  <div className="w-16 h-16 bg-neutral-100 flex items-center justify-center mx-auto mb-6">
-                    <FunnelIcon className="h-8 w-8 text-neutral-400" />
-                  </div>
-                  <h3 className="heading-card mb-4">No products found</h3>
-                  <p className="text-body mb-8">
-                    Try adjusting your search or filter criteria to find what you're looking for.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setCurrentPage(1)
-                      setSortBy('featured')
-                      window.history.pushState({}, '', '/products')
-                      fetchProducts()
-                    }}
-                    className="btn-primary"
-                  >
-                    Clear All Filters
-                  </button>
-                </div>
-              </div>
             )}
           </div>
         </div>
@@ -385,18 +441,10 @@ function ProductsContent() {
 export default function ProductsPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-neutral-50">
-        <div className="container-width section-padding py-8">
-          <div className="skeleton h-12 w-1/3 mb-8"></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, index) => (
-              <div key={index} className="card p-6 space-y-4">
-                <div className="skeleton aspect-square"></div>
-                <div className="skeleton h-6 w-3/4"></div>
-                <div className="skeleton h-4 w-1/2"></div>
-              </div>
-            ))}
-          </div>
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-neutral-600">Loading products...</p>
         </div>
       </div>
     }>

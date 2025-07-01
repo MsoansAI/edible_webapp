@@ -21,17 +21,62 @@ export default function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isFavorite, setIsFavorite] = useState(false)
   const [mainImage, setMainImage] = useState<string>('')
+  const [currentDescription, setCurrentDescription] = useState<string>('')
   const [isAddingToCart, setIsAddingToCart] = useState(false)
+  const [ingredients, setIngredients] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const { addItem } = useCartStore()
 
-  // Handle option change and image switching
+  // Helper functions for category icons
+  const getOccasionIcon = (categoryName: string) => {
+    const icons: { [key: string]: string } = {
+      'Birthday': '🎂',
+      'Congratulations': '🎉',
+      'Get Well': '💐',
+      'Graduation': '🎓',
+      'New Baby': '👶',
+      'Sympathy': '🤍',
+      'Thank you': '💕',
+      'Just because': '✨'
+    }
+    return icons[categoryName] || '🎁'
+  }
+
+  const getDietaryIcon = (categoryName: string) => {
+    const icons: { [key: string]: string } = {
+      'Nut-Free': '🚫🥜',
+      'Vegan-Friendly': '🌱'
+    }
+    return icons[categoryName] || '🥗'
+  }
+
+  const getSeasonIcon = (categoryName: string) => {
+    const icons: { [key: string]: string } = {
+      'Christmas': '🎄',
+      'Spring': '🌸',
+      'Summer': '☀️',
+      'Fall': '🍂',
+      'Winter': '❄️'
+    }
+    return icons[categoryName] || '🗓️'
+  }
+
+  // Handle option change, image switching, and description update
   const handleOptionChange = (option: ProductOption | null) => {
     setSelectedOption(option)
+    
     // Switch main image based on selected option
     if (option && option.image_url) {
       setMainImage(option.image_url)
     } else if (product) {
       setMainImage(product.image_url || '')
+    }
+    
+    // Switch description based on selected option
+    if (option && option.description) {
+      setCurrentDescription(option.description)
+    } else if (product) {
+      setCurrentDescription(product.description || 'A premium handcrafted arrangement made with the freshest ingredients. Perfect for any special occasion or as a thoughtful gift to show you care.')
     }
   }
 
@@ -59,6 +104,7 @@ export default function ProductDetailPage() {
 
       setProduct(productData)
       setMainImage(productData.image_url || '')
+      setCurrentDescription(productData.description || 'A premium handcrafted arrangement made with the freshest ingredients. Perfect for any special occasion or as a thoughtful gift to show you care.')
 
       // Fetch product options
       const { data: optionsData, error: optionsError } = await supabase
@@ -71,7 +117,44 @@ export default function ProductDetailPage() {
       if (optionsError) {
         console.error('Error fetching options:', optionsError)
       } else {
-        setOptions(optionsData || [])
+        const fetchedOptions = optionsData || []
+        setOptions(fetchedOptions)
+        
+        // If there are options, automatically select the first one
+        if (fetchedOptions.length > 0) {
+          const firstOption = fetchedOptions[0]
+          setSelectedOption(firstOption)
+          if (firstOption.image_url) {
+            setMainImage(firstOption.image_url)
+          }
+          if (firstOption.description) {
+            setCurrentDescription(firstOption.description)
+          }
+        }
+      }
+
+      // Fetch product ingredients
+      const { data: ingredientsData, error: ingredientsError } = await supabase
+        .from('product_ingredients')
+        .select('ingredients(*)')
+        .eq('product_id', productData.id)
+
+      if (ingredientsError) {
+        console.error('Error fetching ingredients:', ingredientsError)
+      } else {
+        setIngredients(ingredientsData?.map(pi => pi.ingredients) || [])
+      }
+
+      // Fetch product categories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('product_categories')
+        .select('categories(*)')
+        .eq('product_id', productData.id)
+
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError)
+      } else {
+        setCategories(categoriesData?.map(pc => pc.categories) || [])
       }
     } catch (error) {
       console.error('Error fetching product:', error)
@@ -246,40 +329,16 @@ export default function ProductDetailPage() {
             <div>
               <h3 className="heading-card mb-4">Description</h3>
               <p className="text-body leading-relaxed">
-                {product.description || 'A premium handcrafted arrangement made with the freshest ingredients. Perfect for any special occasion or as a thoughtful gift to show you care.'}
+                {currentDescription}
               </p>
             </div>
 
-            {/* Product Options - Simple Rectangles (like Edible Arrangements) */}
-            {options.length > 0 && (
+            {/* Product Options */}
+            {options.length > 0 ? (
               <div>
                 <h3 className="heading-card mb-4">Choose an Option:</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  {/* Standard Size Option */}
-                  <button
-                    onClick={() => handleOptionChange(null)}
-                    className={`flex items-center p-3 border transition-all duration-200 ${
-                      !selectedOption 
-                        ? 'border-primary-600 bg-white ring-2 ring-primary-600' 
-                        : 'border-neutral-200 hover:border-neutral-300 bg-white'
-                    }`}
-                  >
-                    <div className="w-16 h-12 bg-neutral-100 mr-3 flex-shrink-0 relative overflow-hidden">
-                      <Image
-                        src={product.image_url || 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp'}
-                        alt="Standard Size"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="font-semibold text-sm text-neutral-900">Standard</div>
-                      <div className="font-bold text-primary-600">${product.base_price.toFixed(2)}</div>
-                      <p className="text-xs text-neutral-600">Perfect for most occasions</p>
-                    </div>
-                  </button>
-                  
-                  {/* Dynamic Options */}
+                  {/* Only show real options from database */}
                   {options.map((option) => (
                     <button
                       key={option.id}
@@ -301,12 +360,33 @@ export default function ProductDetailPage() {
                       <div className="flex-1 text-left">
                         <div className="font-semibold text-sm text-neutral-900">{option.option_name}</div>
                         <div className="font-bold text-primary-600">${option.price.toFixed(2)}</div>
-                        {option.description && (
-                          <p className="text-xs text-neutral-600">{option.description}</p>
-                        )}
                       </div>
                     </button>
                   ))}
+                </div>
+              </div>
+            ) : (
+              /* No options in database - show standard mode */
+              <div>
+                <h3 className="heading-card mb-4">Size:</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    onClick={() => handleOptionChange(null)}
+                    className="flex items-center p-3 border border-primary-600 bg-white ring-2 ring-primary-600 cursor-default"
+                  >
+                    <div className="w-16 h-12 bg-neutral-100 mr-3 flex-shrink-0 relative overflow-hidden">
+                      <Image
+                        src={product.image_url || 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp'}
+                        alt="Standard Size"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-semibold text-sm text-neutral-900">Standard</div>
+                      <div className="font-bold text-primary-600">${product.base_price.toFixed(2)}</div>
+                    </div>
+                  </button>
                 </div>
               </div>
             )}
@@ -395,6 +475,71 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
+            {/* Ingredients */}
+            {ingredients.length > 0 && (
+              <div className="border-t border-neutral-200 pt-8">
+                <h4 className="heading-card mb-4">Ingredients</h4>
+                <div className="flex flex-wrap gap-2">
+                  {ingredients.map((ingredient) => (
+                    <span
+                      key={ingredient.id}
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                        ingredient.is_allergen
+                          ? 'bg-warning-100 text-warning-800 border border-warning-200'
+                          : 'bg-neutral-100 text-neutral-800 border border-neutral-200'
+                      }`}
+                    >
+                      {ingredient.is_allergen && (
+                        <span className="mr-1">⚠️</span>
+                      )}
+                      {ingredient.name}
+                    </span>
+                  ))}
+                </div>
+                {ingredients.some(i => i.is_allergen) && (
+                  <p className="text-sm text-warning-600 mt-3 flex items-center">
+                    <span className="mr-2">⚠️</span>
+                    Contains allergens - please check ingredient list carefully
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Categories */}
+            {categories.length > 0 && (
+              <div className="border-t border-neutral-200 pt-8">
+                <h4 className="heading-card mb-4">Categories</h4>
+                <div className="space-y-3">
+                  {['occasion', 'dietary', 'season'].map((type) => {
+                    const typeCategories = categories.filter(c => c.type === type)
+                    if (typeCategories.length === 0) return null
+                    
+                    return (
+                      <div key={type}>
+                        <h5 className="text-sm font-medium text-neutral-600 capitalize mb-2">
+                          {type === 'occasion' ? 'Perfect For' : type === 'dietary' ? 'Dietary' : 'Seasonal'}
+                        </h5>
+                        <div className="flex flex-wrap gap-2">
+                          {typeCategories.map((category) => (
+                            <Link
+                              key={category.id}
+                              href={`/products?category=${category.name}`}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-50 text-primary-700 border border-primary-200 hover:bg-primary-100 transition-colors duration-200"
+                            >
+                              {type === 'occasion' && getOccasionIcon(category.name)}
+                              {type === 'dietary' && getDietaryIcon(category.name)}
+                              {type === 'season' && getSeasonIcon(category.name)}
+                              <span className={type !== 'occasion' ? 'ml-1' : ''}>{category.name}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Product Details */}
             <div className="border-t border-neutral-200 pt-8">
               <h4 className="heading-card mb-4">Product Details</h4>
@@ -409,7 +554,9 @@ export default function ProductDetailPage() {
                 </div>
                 <div>
                   <dt className="text-neutral-600 font-medium">Allergen Info</dt>
-                  <dd className="text-neutral-900">May contain nuts</dd>
+                  <dd className="text-neutral-900">
+                    {ingredients.some(i => i.is_allergen) ? 'Contains allergens' : 'No known allergens'}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-neutral-600 font-medium">Storage</dt>
@@ -417,6 +564,26 @@ export default function ProductDetailPage() {
                 </div>
               </dl>
             </div>
+          </div>
+        </div>
+
+        {/* Related Products */}
+        <div className="mt-16 pt-16 border-t border-neutral-200">
+          <h3 className="heading-section mb-8 text-center">You Might Also Like</h3>
+          <div className="text-center text-neutral-600 mb-8">
+            <p>Discover more arrangements perfect for similar occasions</p>
+          </div>
+          {/* Note: Related products functionality can be added here when needed */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white border border-neutral-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                <div className="aspect-square bg-neutral-100 rounded-lg mb-4 flex items-center justify-center">
+                  <span className="text-sm text-neutral-500">Related Product {i + 1}</span>
+                </div>
+                <h4 className="font-semibold text-sm mb-2">Similar Arrangement</h4>
+                <p className="text-primary-600 font-bold">$XX.XX</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

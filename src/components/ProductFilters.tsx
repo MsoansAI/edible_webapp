@@ -1,27 +1,58 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
+import { ChevronDownIcon, ChevronUpIcon, XMarkIcon, FunnelIcon } from '@heroicons/react/24/outline'
 import { Category } from '@/types/database'
 
 interface ProductFiltersProps {
   categories: Category[]
+  totalCount?: number
 }
 
-export default function ProductFilters({ categories }: ProductFiltersProps) {
+interface CategoryGroup {
+  type: string
+  categories: Category[]
+  label: string
+  icon?: string
+}
+
+export default function ProductFilters({ categories, totalCount = 0 }: ProductFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [expandedSections, setExpandedSections] = useState({
-    categories: true,
-    price: true,
     occasions: true,
+    dietary: false,
+    seasonal: false,
+    price: true,
   })
 
   const [priceRange, setPriceRange] = useState({
     min: searchParams.get('minPrice') || '',
     max: searchParams.get('maxPrice') || '',
   })
+
+  // Group categories by type
+  const categoryGroups: CategoryGroup[] = [
+    {
+      type: 'occasion',
+      label: 'Occasions',
+      categories: categories.filter(cat => cat.type === 'occasion'),
+      icon: '🎉'
+    },
+    {
+      type: 'dietary',
+      label: 'Dietary Options',
+      categories: categories.filter(cat => cat.type === 'dietary'),
+      icon: '🥗'
+    },
+    {
+      type: 'season',
+      label: 'Seasonal',
+      categories: categories.filter(cat => cat.type === 'season'),
+      icon: '🌸'
+    }
+  ]
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -38,6 +69,9 @@ export default function ProductFilters({ categories }: ProductFiltersProps) {
     } else {
       params.delete(key)
     }
+    
+    // Reset to first page when filtering
+    params.delete('page')
     
     router.push(`/products?${params.toString()}`)
   }
@@ -57,6 +91,7 @@ export default function ProductFilters({ categories }: ProductFiltersProps) {
       params.delete('maxPrice')
     }
     
+    params.delete('page')
     router.push(`/products?${params.toString()}`)
   }
 
@@ -69,12 +104,6 @@ export default function ProductFilters({ categories }: ProductFiltersProps) {
   const currentMinPrice = searchParams.get('minPrice')
   const currentMaxPrice = searchParams.get('maxPrice')
 
-  const quickCategories = [
-    { key: 'arrangements', label: 'Fruit Arrangements', count: 45 },
-    { key: 'chocolate', label: 'Chocolate Berries', count: 28 },
-    { key: 'occasion', label: 'Occasion Gifts', count: 32 },
-  ]
-
   const priceRanges = [
     { label: 'Under $30', min: '', max: '30' },
     { label: '$30 - $50', min: '30', max: '50' },
@@ -83,83 +112,114 @@ export default function ProductFilters({ categories }: ProductFiltersProps) {
     { label: 'Over $100', min: '100', max: '' },
   ]
 
-  const occasions = [
-    { key: 'birthday', label: 'Birthday' },
-    { key: 'anniversary', label: 'Anniversary' },
-    { key: 'valentine', label: "Valentine's Day" },
-    { key: 'mother', label: "Mother's Day" },
-    { key: 'graduation', label: 'Graduation' },
-    { key: 'sympathy', label: 'Sympathy' },
-  ]
+  // Count active filters
+  const activeFiltersCount = [currentCategory, currentMinPrice, currentMaxPrice].filter(Boolean).length
 
   return (
     <div className="space-y-6">
-      {/* Clear Filters */}
-      {(currentCategory || currentMinPrice || currentMaxPrice) && (
-        <div className="pb-6 border-b border-gray-200">
+      
+      {/* Filter Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <FunnelIcon className="h-5 w-5 text-neutral-600" />
+          <h2 className="text-lg font-semibold text-neutral-900">Filters</h2>
+          {activeFiltersCount > 0 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+              {activeFiltersCount}
+            </span>
+          )}
+        </div>
+        
+        {activeFiltersCount > 0 && (
           <button
             onClick={clearAllFilters}
-            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+            className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center space-x-1"
           >
-            Clear All Filters
+            <XMarkIcon className="h-4 w-4" />
+            <span>Clear All</span>
           </button>
-        </div>
-      )}
-
-      {/* Categories */}
-      <div className="border-b border-gray-200 pb-6">
-        <button
-          onClick={() => toggleSection('categories')}
-          className="flex items-center justify-between w-full text-left"
-        >
-          <h3 className="text-lg font-medium text-gray-900">Categories</h3>
-          {expandedSections.categories ? (
-            <ChevronUpIcon className="h-5 w-5 text-gray-400" />
-          ) : (
-            <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-          )}
-        </button>
-        
-        {expandedSections.categories && (
-          <div className="mt-4 space-y-3">
-            {quickCategories.map((category) => (
-              <label key={category.key} className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="category"
-                  value={category.key}
-                  checked={currentCategory === category.key}
-                  onChange={(e) => updateFilters('category', e.target.checked ? category.key : null)}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                />
-                <span className="ml-3 text-sm text-gray-700 flex-1">{category.label}</span>
-                <span className="text-xs text-gray-500">({category.count})</span>
-              </label>
-            ))}
-          </div>
         )}
       </div>
 
+      {/* Results Count */}
+      <div className="text-sm text-neutral-600 bg-neutral-50 p-3 rounded-lg">
+        <span className="font-medium text-neutral-900">{totalCount}</span> products found
+      </div>
+
+      {/* Category Groups */}
+      {categoryGroups.map((group) => {
+        const sectionKey = group.type as keyof typeof expandedSections
+        const isExpanded = expandedSections[sectionKey]
+        
+        if (group.categories.length === 0) return null
+
+        return (
+          <div key={group.type} className="border-b border-neutral-200 pb-6">
+            <button
+              onClick={() => toggleSection(sectionKey)}
+              className="flex items-center justify-between w-full text-left hover:text-primary-600 transition-colors"
+            >
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">{group.icon}</span>
+                <h3 className="text-base font-medium text-neutral-900">{group.label}</h3>
+                <span className="text-xs text-neutral-500">({group.categories.length})</span>
+              </div>
+              {isExpanded ? (
+                <ChevronUpIcon className="h-4 w-4 text-neutral-400" />
+              ) : (
+                <ChevronDownIcon className="h-4 w-4 text-neutral-400" />
+              )}
+            </button>
+            
+            {isExpanded && (
+              <div className="mt-4 space-y-2 pl-8">
+                {group.categories
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((category) => (
+                  <label key={category.id} className="flex items-center cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="category"
+                      value={category.name}
+                      checked={currentCategory === category.name}
+                      onChange={(e) => updateFilters('category', e.target.checked ? category.name : null)}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 transition-colors"
+                    />
+                    <span className="ml-3 text-sm text-neutral-700 group-hover:text-primary-600 transition-colors flex-1">
+                      {category.name}
+                    </span>
+                    {/* You could add product count per category here if needed */}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
       {/* Price Range */}
-      <div className="border-b border-gray-200 pb-6">
+      <div className="border-b border-neutral-200 pb-6">
         <button
           onClick={() => toggleSection('price')}
-          className="flex items-center justify-between w-full text-left"
+          className="flex items-center justify-between w-full text-left hover:text-primary-600 transition-colors"
         >
-          <h3 className="text-lg font-medium text-gray-900">Price Range</h3>
+          <div className="flex items-center space-x-2">
+            <span className="text-lg">💰</span>
+            <h3 className="text-base font-medium text-neutral-900">Price Range</h3>
+          </div>
           {expandedSections.price ? (
-            <ChevronUpIcon className="h-5 w-5 text-gray-400" />
+            <ChevronUpIcon className="h-4 w-4 text-neutral-400" />
           ) : (
-            <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+            <ChevronDownIcon className="h-4 w-4 text-neutral-400" />
           )}
         </button>
         
         {expandedSections.price && (
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-4 pl-8">
             {/* Quick Price Ranges */}
             <div className="space-y-2">
               {priceRanges.map((range, index) => (
-                <label key={index} className="flex items-center cursor-pointer">
+                <label key={index} className="flex items-center cursor-pointer group">
                   <input
                     type="radio"
                     name="priceRange"
@@ -171,37 +231,46 @@ export default function ProductFilters({ categories }: ProductFiltersProps) {
                       else params.delete('minPrice')
                       if (range.max) params.set('maxPrice', range.max)
                       else params.delete('maxPrice')
+                      params.delete('page')
                       router.push(`/products?${params.toString()}`)
                     }}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300"
                   />
-                  <span className="ml-3 text-sm text-gray-700">{range.label}</span>
+                  <span className="ml-3 text-sm text-neutral-700 group-hover:text-primary-600 transition-colors">
+                    {range.label}
+                  </span>
                 </label>
               ))}
             </div>
             
             {/* Custom Price Range */}
-            <div className="pt-4 border-t border-gray-100">
-              <p className="text-sm font-medium text-gray-700 mb-3">Custom Range</p>
+            <div className="pt-4 border-t border-neutral-100">
+              <p className="text-sm font-medium text-neutral-700 mb-3">Custom Range</p>
               <div className="flex items-center space-x-2">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={priceRange.min}
-                  onChange={(e) => setPriceRange(prev => ({ ...prev, min: e.target.value }))}
-                  className="input-field text-sm w-20"
-                />
-                <span className="text-gray-500">-</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={priceRange.max}
-                  onChange={(e) => setPriceRange(prev => ({ ...prev, max: e.target.value }))}
-                  className="input-field text-sm w-20"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">$</span>
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={priceRange.min}
+                    onChange={(e) => setPriceRange(prev => ({ ...prev, min: e.target.value }))}
+                    className="input-field text-sm pl-7 w-24"
+                  />
+                </div>
+                <span className="text-neutral-400">-</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">$</span>
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    value={priceRange.max}
+                    onChange={(e) => setPriceRange(prev => ({ ...prev, max: e.target.value }))}
+                    className="input-field text-sm pl-7 w-24"
+                  />
+                </div>
                 <button
                   onClick={handlePriceFilter}
-                  className="btn-primary text-xs px-3 py-1"
+                  className="btn-secondary btn-small"
                 >
                   Apply
                 </button>
@@ -211,63 +280,20 @@ export default function ProductFilters({ categories }: ProductFiltersProps) {
         )}
       </div>
 
-      {/* Occasions */}
-      <div className="border-b border-gray-200 pb-6">
-        <button
-          onClick={() => toggleSection('occasions')}
-          className="flex items-center justify-between w-full text-left"
-        >
-          <h3 className="text-lg font-medium text-gray-900">Occasions</h3>
-          {expandedSections.occasions ? (
-            <ChevronUpIcon className="h-5 w-5 text-gray-400" />
-          ) : (
-            <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-          )}
-        </button>
-        
-        {expandedSections.occasions && (
-          <div className="mt-4 space-y-3">
-            {occasions.map((occasion) => (
-              <label key={occasion.key} className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  value={occasion.key}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <span className="ml-3 text-sm text-gray-700">{occasion.label}</span>
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Additional Filters */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Additional Filters</h3>
-        
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-          />
-          <span className="ml-3 text-sm text-gray-700">Same-day delivery available</span>
-        </label>
-        
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-          />
-          <span className="ml-3 text-sm text-gray-700">Free delivery eligible</span>
-        </label>
-        
-        <label className="flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-          />
-          <span className="ml-3 text-sm text-gray-700">Nut-free options</span>
-        </label>
+      {/* Popular Searches - could be dynamic based on search analytics */}
+      <div className="pt-4">
+        <h4 className="text-sm font-medium text-neutral-700 mb-3">Popular Searches</h4>
+        <div className="flex flex-wrap gap-2">
+          {['Birthday', 'Chocolate Dipped Fruit', 'Mother\'s Day', 'Gift Sets', 'Fresh Fruits Arrangements'].map((term) => (
+            <button
+              key={term}
+              onClick={() => updateFilters('category', term)}
+              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 hover:bg-primary-100 hover:text-primary-700 transition-colors"
+            >
+              {term}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
