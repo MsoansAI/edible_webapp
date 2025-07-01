@@ -298,12 +298,12 @@ export default function HomePage() {
             <h3 className="text-xl font-semibold text-center mb-8 text-neutral-700">Popular Occasions</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
               {[
-                { name: 'Birthday', icon: '🎂', link: '/products?category=Birthday' },
-                { name: 'Congratulations', icon: '🎉', link: '/products?category=Congratulations' },
-                { name: 'Get Well', icon: '💐', link: '/products?category=Get Well' },
-                { name: 'Graduation', icon: '🎓', link: '/products?category=Graduation' },
-                { name: 'New Baby', icon: '👶', link: '/products?category=New Baby' },
-                { name: 'Sympathy', icon: '🤍', link: '/products?category=Sympathy' }
+                { name: 'Birthday', icon: '🎂', link: '/products?category=Birthday', count: '15 items' },
+                { name: 'Congratulations', icon: '🎉', link: '/products?category=Congratulations', count: '65 items' },
+                { name: 'Get Well', icon: '🌻', link: '/products?category=Get%20Well', count: '31 items' },
+                { name: 'Graduation', icon: '🎓', link: '/products?category=Graduation', count: '23 items' },
+                { name: 'New Baby', icon: '👶', link: '/products?category=New%20Baby', count: '46 items' },
+                { name: 'Just Because', icon: '💕', link: '/products?category=Just%20because', count: '49 items' }
               ].map((category, index) => (
                 <Link
                   key={index}
@@ -316,6 +316,9 @@ export default function HomePage() {
                   <h4 className="font-semibold text-neutral-800 group-hover:text-primary-600 transition-colors">
                     {category.name}
                   </h4>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {category.count}
+                  </p>
                 </Link>
               ))}
             </div>
@@ -330,25 +333,29 @@ export default function HomePage() {
                   name: 'Fresh Fruits', 
                   description: 'Premium fresh fruit arrangements',
                   image: 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp',
-                  link: '/products?category=Fresh Fruits'
+                  link: '/products?category=Fresh%20Fruits%20Arrangements',
+                  count: '14 items'
                 },
                 { 
                   name: 'Chocolate Dipped', 
                   description: 'Decadent chocolate-dipped treats',
                   image: 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp',
-                  link: '/products?category=Chocolate Dipped Fruit'
+                  link: '/products?category=Chocolate%20Dipped%20Fruit',
+                  count: '22 items'
                 },
                 { 
                   name: 'Gift Sets', 
                   description: 'Curated gift collections',
                   image: 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp',
-                  link: '/products?category=Gift Sets'
+                  link: '/products?category=Gift%20Sets',
+                  count: '18 items'
                 },
                 { 
                   name: 'Edible Bakeshop', 
                   description: 'Baked goods and sweet treats',
                   image: 'https://rescloud.ediblearrangements.com/image/private/t_EA_PDP/Creative-Marketing/Products/SKU/6479_5507_No1_Mom_Fruit_Arrangement_MOM_s.webp',
-                  link: '/products?category=Edible Bakeshop'
+                  link: '/products?category=Edible%20Bakeshop',
+                  count: '8 items'
                 }
               ].map((category, index) => (
                 <Link
@@ -370,6 +377,9 @@ export default function HomePage() {
                       </h4>
                       <p className="text-white/90 text-sm">
                         {category.description}
+                      </p>
+                      <p className="text-white/70 text-xs mt-1">
+                        {category.count}
                       </p>
                     </div>
                   </div>
